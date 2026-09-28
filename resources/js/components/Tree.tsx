@@ -289,7 +289,9 @@ export default function Tree({
 
     foldersOf(parentId).forEach((folder) => {
       const isOpen = !!expanded[folder.id];
-      const selected = selection.type === 'folder' && selection.id === folder.id && !isOpen;
+      // The container the reader is in stays lit while a note or file inside it is open: the
+      // open item says which thing, this row says where. Two items never light at once.
+      const selected = selection.type === 'folder' && selection.id === folder.id;
       const direct = notesOf(folder.id).length + attachmentsOf(folder.id).length;
       const key = folder.id;
 
@@ -310,11 +312,17 @@ export default function Tree({
           draggable
           style={indentStyle(depth)}
           title={folder.name}
-          onClick={() => actions.onSelect({ type: 'folder', id: folder.id })}
+          onClick={() => {
+            // The row is the folder's own control: clicking it shows the folder in the pane and
+            // folds it, so the disclosure does not live on a 12px arrow nobody aims at.
+            actions.onSelect({ type: 'folder', id: folder.id });
+            actions.onToggleFolder(folder.id);
+          }}
           onKeyDown={(event) => {
             if (event.key === 'Enter' || event.key === ' ') {
               event.preventDefault();
               actions.onSelect({ type: 'folder', id: folder.id });
+              actions.onToggleFolder(folder.id);
             } else {
               onRowKey(event, folder);
             }
@@ -374,11 +382,9 @@ export default function Tree({
 
   const rootNotes = notesOf(null);
   const rootFiles = attachmentsOf(null);
-  // One row is active at a time: the item that is open, or, with nothing open, the container the
-  // pane is listing. A container that stayed lit under the note or file it holds read as a second
-  // open item, which is two answers to "where am I".
-  const isOpen = activeNoteId !== null || activeAttachmentId !== null;
-  const rootSelected = selection.type === 'all' && !isOpen;
+  // The open item and the container it lives in are the two halves of one answer: the row lit
+  // for the thing, and the row lit for the place. Never two items, because only one is open.
+  const rootSelected = selection.type === 'all';
 
   return (
     <div className="tree" role="tree" aria-label="Folders, notes and files" ref={hostRef}>
