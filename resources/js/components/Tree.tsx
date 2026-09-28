@@ -289,7 +289,7 @@ export default function Tree({
 
     foldersOf(parentId).forEach((folder) => {
       const isOpen = !!expanded[folder.id];
-      const selected = selection.type === 'folder' && selection.id === folder.id;
+      const selected = selection.type === 'folder' && selection.id === folder.id && !isOpen;
       const direct = notesOf(folder.id).length + attachmentsOf(folder.id).length;
       const key = folder.id;
 
@@ -374,7 +374,11 @@ export default function Tree({
 
   const rootNotes = notesOf(null);
   const rootFiles = attachmentsOf(null);
-  const rootSelected = selection.type === 'all';
+  // One row is active at a time: the item that is open, or, with nothing open, the container the
+  // pane is listing. A container that stayed lit under the note or file it holds read as a second
+  // open item, which is two answers to "where am I".
+  const isOpen = activeNoteId !== null || activeAttachmentId !== null;
+  const rootSelected = selection.type === 'all' && !isOpen;
 
   return (
     <div className="tree" role="tree" aria-label="Folders, notes and files" ref={hostRef}>
