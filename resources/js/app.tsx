@@ -6,6 +6,7 @@
  * what keeps the tree, the sort and the search from being re-mounted by navigation.
  */
 
+import type { JSX } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import Login from './pages/Login';

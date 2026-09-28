@@ -15,7 +15,7 @@
  */
 
 import { useCallback, useRef, useState } from 'react';
-import type { DragEvent, HTMLAttributes, KeyboardEvent, ReactNode } from 'react';
+import type { CSSProperties, DragEvent, HTMLAttributes, JSX, KeyboardEvent, ReactNode } from 'react';
 import Icon from './Icon';
 import type { IconName } from './Icon';
 import { extensionBadge, formatBytes, formatRelative, noteTitle } from '../lib/format';
@@ -74,8 +74,10 @@ export interface TreeProps {
 
 const DEPTH_LIMIT = 16;
 
-function indentStyle(depth: number): { ['--indent']: string } {
-  return { '--indent': depth * 14 + 'px' };
+function indentStyle(depth: number): CSSProperties {
+  // A CSS custom property is not part of CSSProperties, but the ported stylesheet reads
+  // --indent to place the folder guide rails, so the name and the px value stay as they are.
+  return { '--indent': depth * 14 + 'px' } as CSSProperties;
 }
 
 function depthClass(depth: number): string {

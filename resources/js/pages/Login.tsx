@@ -7,7 +7,7 @@
  */
 
 import { useState } from 'react';
-import type { FormEvent } from 'react';
+import type { FormEvent, JSX } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ApiError } from '../api/client';
 import { useAuth } from '../context/AuthContext';

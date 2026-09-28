@@ -6,6 +6,7 @@
  */
 
 import { useEffect, useRef } from 'react';
+import type { JSX } from 'react';
 import Icon from './Icon';
 import { usePreferences } from '../context/PreferencesContext';
 

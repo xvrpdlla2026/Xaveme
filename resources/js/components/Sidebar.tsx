@@ -7,7 +7,7 @@
  */
 
 import { useRef, useState } from 'react';
-import type { MouseEvent } from 'react';
+import type { JSX, MouseEvent } from 'react';
 import Icon from './Icon';
 import Tree from './Tree';
 import { ContextMenu } from './dialogs';

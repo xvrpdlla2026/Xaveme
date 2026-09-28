@@ -7,7 +7,7 @@
  * has to repaint them with the live accent token.
  */
 
-import type { SVGProps } from 'react';
+import type { JSX, SVGProps } from 'react';
 
 export type IconName =
   | 'arrowLeft'

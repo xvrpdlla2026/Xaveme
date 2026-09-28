@@ -13,7 +13,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { DragEvent } from "react";
+import type { DragEvent, JSX } from "react";
 import * as attachmentApi from "../api/attachments";
 import * as folderApi from "../api/folders";
 import * as noteApi from "../api/notes";
@@ -758,6 +758,9 @@ export default function Workspace(): JSX.Element {
     [targetFolder, uploadFiles],
   );
 
+  /** The open note, or null when the reader is looking at something else. */
+  const activeNote = useMemo(() => notes.find((note) => note.id === activeNoteId) ?? null, [activeNoteId, notes]);
+
   /**
    * What the sort menu's Move up and Move down act on.
    *
@@ -784,8 +787,6 @@ export default function Workspace(): JSX.Element {
   );
 
   // ---------------------------------------------------------------------- editor
-
-  const activeNote = useMemo(() => notes.find((note) => note.id === activeNoteId) ?? null, [activeNoteId, notes]);
 
   const onSave: EditorSave = useCallback(
     async (draft, mode) => {
@@ -1067,6 +1068,7 @@ export default function Workspace(): JSX.Element {
           usedBytes: stats ? stats.attachment_bytes ?? 0 : 0,
           noteCount: stats ? stats.notes : notes.length,
           quotaBytes,
+          stats: stats ?? null,
         }}
         uploadStatus={uploadStatus}
         onUploadClick={onPickFile}

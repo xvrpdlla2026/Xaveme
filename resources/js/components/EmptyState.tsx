@@ -6,7 +6,7 @@
  * next depends on which list is empty.
  */
 
-import type { ReactNode } from 'react';
+import type { JSX, ReactNode } from 'react';
 
 export interface EmptyStateProps {
   /** A short mark above the copy: two letters, or a glyph. Omitted when there is none. */

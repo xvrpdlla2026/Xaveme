@@ -11,7 +11,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
+import type { JSX, KeyboardEvent as ReactKeyboardEvent } from 'react';
 import Icon from './Icon';
 import { debounce } from '../lib/idle';
 import { formatClock, formatRelative, formatStamp } from '../lib/format';

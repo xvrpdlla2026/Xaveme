@@ -10,7 +10,7 @@
  */
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import type { ReactNode } from 'react';
+import type { JSX, ReactNode } from 'react';
 import * as auth from '../api/auth';
 import { ApiError, setUnauthorizedHandler, type RequestOptions } from '../api/client';
 import type { User } from '../types';

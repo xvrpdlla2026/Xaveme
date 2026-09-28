@@ -13,7 +13,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import type { FormEvent, ReactNode } from 'react';
+import type { FormEvent, JSX, ReactNode } from 'react';
 import Icon from './Icon';
 import type { IconName } from './Icon';
 
@@ -109,6 +109,8 @@ export interface ConfirmDialogProps {
   /** Return a promise to keep the dialog open with a busy footer until it settles. */
   onConfirm: () => void | Promise<void>;
   onCancel: () => void;
+  /** Extra fields the question needs, drawn under the message. Omitted by most callers. */
+  children?: ReactNode;
 }
 
 /** A yes/no question about something that cannot be undone quietly. */
@@ -123,6 +125,7 @@ export function ConfirmDialog({
   danger,
   onConfirm,
   onCancel,
+  children,
 }: ConfirmDialogProps): JSX.Element | null {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -180,6 +183,7 @@ export function ConfirmDialog({
           ))}
         </ul>
       ) : null}
+      {children}
       {error ? <p className="field__message field__message--error">{error}</p> : null}
     </DialogShell>
   );
