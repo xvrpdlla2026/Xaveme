@@ -1,15 +1,9 @@
 <?php
 
-use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
-use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
-use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Http\Request;
-use Illuminate\Routing\Middleware\SubstituteBindings;
-use Illuminate\Session\Middleware\StartSession;
-use Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -20,21 +14,17 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        // Cookie based Sanctum auth for the same origin SPA.
+        // Cookie based Sanctum auth for the same origin SPA. statefulApi()
+        // puts EnsureFrontendRequestsAreStateful at the front of the api group
+        // and that middleware injects the cookie, session and CSRF stack
+        // itself for a stateful request. The api group must not be restated
+        // with those same middleware: they would then run twice, so an
+        // incoming session cookie is decrypted a second time, the session is
+        // re-initialised and the response carries a fresh empty session. Route
+        // model binding needs no group edit either, because the default group
+        // already ends with SubstituteBindings and AppServiceProvider binds the
+        // route parameters explicitly.
         $middleware->statefulApi();
-
-        // statefulApi() puts Sanctum's frontend middleware in the middle of the
-        // group, which buries SubstituteBindings behind it. The group is
-        // restated here so route model binding runs first and the session stack
-        // still applies to callers that send no Origin header.
-        $middleware->group('api', [
-            SubstituteBindings::class,
-            EncryptCookies::class,
-            AddQueuedCookiesToResponse::class,
-            StartSession::class,
-            ValidateCsrfToken::class,
-            EnsureFrontendRequestsAreStateful::class,
-        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // The frontend always sends Accept: application/json, so a stray HTML
