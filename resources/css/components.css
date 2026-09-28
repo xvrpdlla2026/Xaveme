@@ -1,0 +1,2246 @@
+/* ==========================================================================
+   Notebook: components
+
+   Everything that sits inside the frame: buttons, the tree, the rail footer,
+   the card grid, the editor, the task pane, the trash panel, dialogs, the
+   custom form controls, the palette chips and the context menu. Built on the
+   native elements wherever one exists: <dialog> gives focus trapping, Escape
+   and scroll lock for free, and the styled dropdown keeps a real <select>
+   underneath.
+   ========================================================================== */
+
+/* --------------------------------------------------------------- buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 550;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--fast), border-color var(--fast), color var(--fast), transform 60ms var(--ease), box-shadow var(--fast);
+}
+.btn:hover { background: var(--bg-hover); border-color: var(--border-strong); }
+.btn:active { transform: translateY(1px); }
+.btn[disabled] { opacity: 0.5; pointer-events: none; }
+
+.btn--primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--text-inverse);
+  box-shadow: var(--shadow-accent);
+}
+.btn--primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+
+.btn--ghost { background: transparent; border-color: transparent; color: var(--text-muted); }
+.btn--ghost:hover { background: var(--bg-hover); color: var(--text); }
+
+.btn--danger { background: var(--danger); border-color: var(--danger); color: var(--text-inverse); }
+.btn--danger:hover { filter: brightness(1.07); }
+
+.btn--danger-ghost { background: transparent; border-color: transparent; color: var(--danger); }
+.btn--danger-ghost:hover { background: var(--danger-soft); }
+
+.btn--block { width: 100%; }
+
+/* An icon-only destructive action: square, and red for a reason that a label would
+   otherwise have to carry. Used in list rows where a full-width button does not fit. */
+.btn--icon-danger {
+  width: 28px;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  color: var(--danger);
+}
+.btn--icon-danger:hover { background: var(--danger-soft); border-color: transparent; color: var(--danger); }
+
+.btn--sm { height: 28px; padding: 0 10px; font-size: 12px; }
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px; height: 32px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 14px;
+  cursor: pointer;
+  transition: background var(--fast), color var(--fast), transform 60ms var(--ease);
+}
+.icon-btn:hover { background: var(--bg-hover); color: var(--text); }
+.icon-btn:active { transform: translateY(1px); }
+.icon-btn--sm { width: 28px; height: 28px; font-size: 15px; }
+
+.link-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 2px;
+  transition: text-decoration-color var(--fast), color var(--fast);
+}
+.link-btn:hover { color: var(--text); text-decoration-color: currentColor; }
+.link-btn--danger:hover { color: var(--danger); }
+
+/* Small icon+label buttons for the workspace actions under the switcher. */
+.mini-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--fast), color var(--fast);
+}
+.mini-btn .icon { font-size: 13.5px; }
+.mini-btn:hover { background: var(--bg-hover); color: var(--text); }
+.mini-btn--danger:hover { background: var(--danger-soft); color: var(--danger); }
+
+/* ------------------------------------------------------------------ tree */
+/* Row rhythm. Everything about vertical spacing lives in this block, because the
+   relationships it encodes are the whole point: siblings breathe, and a child reads as
+   belonging to the row above it.
+     - --tree-gap    space between any two adjacent rows
+     - --tree-group  space opening a child group, so a parent's children sit closer to
+                     their parent than to the next sibling folder
+     - --tree-break  space around the workspace root, which is a section of its own
+   The gap is what stops a hovered row's fill from touching its neighbours, and the whole
+   ladder is deliberately tight: the sidebar is 296px wide and has to hold three levels of
+   hierarchy without the labels running out of room, so the depth is carried by indent,
+   icon and weight rather than by air. */
+.tree {
+  --tree-gap: 3px;
+  --tree-group: 7px;
+  --tree-break: 14px;
+  /* The row is inset from the rail by this much: it is the row's own leading gutter. */
+  --tree-inset: 8px;
+  /* The disclosure slot: a compact column the chevron sits in, immediately after the
+     selection bar. It is exactly one indent step (--tree-indent), so a folder's chevron
+     occupies the same step its children are indented by - that is what keeps a folder's
+     icon and label in the same columns as the notes inside it. It must stay equal to
+     --tree-indent: the row's leading padding is built from this value, so changing one
+     without the other slides every nested label out of its parent's column. */
+  --tree-chevron: var(--tree-indent);
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0 8px 10px;
+  scrollbar-gutter: stable;
+}
+
+/* One grid: disclosure slot, icon, label, trailing count. The leading accent bar of a
+   selected row is drawn in the padding to the left of this grid (see .is-active below),
+   which keeps it attached to the row it marks instead of floating in an outer gutter.
+   Grid rather than flex because the columns must line up down the whole tree, and because
+   it removed the negative-margin hack the chevron used to need. */
+.tree__row {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--tree-chevron) 20px minmax(0, 1fr) auto;
+  align-items: center;
+  /* Tight: the chevron, its icon and the label are one cluster, so the eye reads them as
+     a single leading mark rather than three spaced tokens. */
+  gap: 4px;
+  min-height: 30px;
+  /* Depth is entirely leading padding: the row's inset, the lane the selection bar is
+     drawn in, the chevron column, then one step per level. The lane term is negative
+     because the selection bar is absolutely positioned 4px in from the row's own edge,
+     so the inset has already reserved the lane it sits in. -12px is the value the whole
+     file is aligned against: the guide rails, the label column and the nested placeholder
+     in `.tree__row--group-start.tree__empty` are all computed to land on this column. */
+  padding: 3px 10px 3px calc(var(--tree-inset) + -12px + var(--tree-chevron) + var(--indent, 0px));
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  user-select: none;
+  color: var(--text);
+  transition: background var(--fast), color var(--fast);
+}
+
+/* Tracks are assigned explicitly, never left to auto-placement: a note or file row has no
+   chevron, so auto-placement would slide its icon and label one track left and squeeze
+   the label into the icon column. The chevron hugs the start of its track - it points at
+   the row, so it belongs beside the selection bar rather than centred in the gutter. */
+.tree__twisty {
+  grid-column: 1;
+  justify-self: start;
+  width: 16px;
+  margin-left: 2px;
+}
+.tree__glyph { grid-column: 2; }
+.tree__label { grid-column: 3; }
+/* Only one of these ever sits in the trailing track of a given row: a folder's child
+   count, or the open note's age. A trailing count does need the extra auto track back -
+   without it the count is pushed onto a second implicit grid row and every counted row
+   doubles in height. */
+.tree__count,
+.tree__when { grid-column: 4; justify-self: end; }
+/* The root's total is a tally rather than a per-row count, so it sits in the auto track
+   right after the label instead of being pushed to the far edge of the rail by
+   `justify-self: end` the way a folder's count is. */
+.tree__badge {
+  grid-column: 4;
+  justify-self: start;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--bg-sunken);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+.tree__row--root:hover .tree__badge { background: var(--bg-active); color: var(--accent); }
+
+/* Separates siblings; the row that opens a child group gets the larger gap instead, so a
+   parent's children cluster to their parent rather than floating between levels. */
+.tree__row + .tree__row { margin-top: var(--tree-gap); }
+.tree__row + .tree__row--group-start { margin-top: var(--tree-group); }
+.tree__empty + .tree__row { margin-top: var(--tree-gap); }
+/* The root is a section divider rather than a sibling: one clear break below it separates
+   "everything" from the folder list without doubling that space back up, because the
+   first folder's own group gap is not applied under the root (ui.js drops the opening gap
+   for the first top-level row). */
+.tree__row--root { margin-bottom: var(--tree-break); }
+
+.tree__row:hover { background: var(--bg-hover); }
+
+/* Hovering a row highlights its whole subtree as one block (the tree flows depth-first,
+   so everything more indented than the hovered row before the next shallower row is its
+   descendant), while the hovered row itself stays the strongest tone. */
+.tree__row--folder:hover ~ .tree__row--nested {
+  background: color-mix(in srgb, var(--bg-hover) 55%, transparent);
+}
+
+/* Selection: the filled pill plus a 2px accent bar just inside the row's leading edge,
+   sitting in the lane reserved to the left of the chevron. Weight and an accent-tinted
+   icon carry the state too, so it never depends on colour alone. */
+.tree__row.is-active { background: var(--bg-active); }
+.tree__row.is-active::before {
+  content: "";
+  position: absolute;
+  left: 4px; top: 5px; bottom: 5px;
+  width: 2px;
+  border-radius: 999px;
+  background: var(--accent);
+}
+.tree__row.is-active .tree__label { font-weight: 620; color: var(--text); }
+.tree__row.is-active svg.tree__glyph { color: var(--accent); }
+
+/* The whole-workspace row is the tree's root: same grid, one step heavier, its total
+   beside the label. */
+.tree__row--root .tree__glyph { color: var(--accent); }
+
+/* The loose items at the workspace root (anything not inside a folder) sit below the
+   folder list, opening with a hairline so the two groups stay legible. */
+.tree__row--loose-start { margin-top: var(--tree-group); }
+.tree__row--loose-start::after {
+  content: "";
+  position: absolute;
+  left: 0; right: var(--tree-inset);
+  top: calc(-1 * var(--tree-group) / 2 - 1px);
+  height: 1px;
+  background: var(--border);
+  pointer-events: none;
+}
+
+/* Guide rails: one hairline per ancestor level, one indent step apart, drawn in the row's
+   leading padding. The lattice starts one step in rather than at the row's own edge: the
+   stripe at 0 points at nothing, because a nested row's nearest ancestor is a top-level
+   folder (or the workspace root) whose disclosure control sits a step further in than
+   that. Left in, it renders as a rail hanging in the sidebar's outer gutter - an extra
+   line above the first real level, running the full length of the subtree with no row
+   beneath the "All notes" break to attach to. They extend into the row gaps to stay
+   continuous. */
+.tree__row--nested::after {
+  content: "";
+  position: absolute;
+  left: var(--tree-indent);
+  top: calc(-1 * var(--tree-gap) - 1px); bottom: calc(-1 * var(--tree-gap) - 1px);
+  /* The original span minus the step the lattice was pulled in by. */
+  width: calc(var(--tree-inset) + var(--tree-chevron) / 2 + 5px + var(--indent, 0px) - 2 * var(--tree-indent));
+  background-image: repeating-linear-gradient(
+    to right,
+    var(--border) 0 1px,
+    transparent 1px var(--tree-indent)
+  );
+  pointer-events: none;
+}
+/* A row's own hairline is hidden by its filled background, which is what keeps a rail
+   from ever crossing a selected row. */
+.tree__row--nested:hover::after { opacity: 0.5; }
+.tree__row--folder:hover ~ .tree__row--nested::after { opacity: 0.55; }
+
+.tree__row--folder .tree__label { font-weight: 520; }
+
+/* Glyph column: a fixed 20px grid track, so labels form one optical edge down the tree
+   whatever the leading mark is (an SVG icon for folders and notes, a type pill for
+   files). SVG glyphs take their box from font-size, so each one states its own. */
+.tree__glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 18px;
+  color: var(--text-faint);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition: color var(--fast);
+}
+svg.tree__glyph { font-size: 15px; }
+svg.tree__glyph--folder { font-size: 16px; stroke-width: 1.5; }
+
+.tree__glyph--note { color: var(--text-faint); }
+svg.tree__glyph--note { font-size: 14.5px; }
+.tree__row:hover svg.tree__glyph--note { color: var(--text-muted); }
+
+/* The folder icon carries the expanded state, not just the chevron: an open folder is
+   tinted, a closed one stays quiet. */
+.tree__row--folder.is-expanded svg.tree__glyph--folder { color: var(--accent); }
+.tree__row--folder:hover svg.tree__glyph--folder { color: var(--text-muted); }
+.tree__row--folder.is-expanded:hover svg.tree__glyph--folder { color: var(--accent); }
+
+/* Files keep a type pill rather than a document icon: TXT / PDF / CSV is what you scan
+   an attachment list for. It hugs the leading edge of the glyph track rather than filling
+   it, and the trailing letter-spacing is cancelled so the pill stays optically centred. */
+.tree__glyph--file {
+  width: auto;
+  min-width: 24px;
+  justify-self: start;
+  padding: 0 4px;
+  border-radius: var(--radius-xs);
+  background: var(--bg-sunken);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-indent: 0.03em;
+}
+.tree__row:hover .tree__glyph--file { background: var(--bg-active); color: var(--accent); }
+
+/* Twisty: a 16px hit target matching --twisty-w, no layout shift on toggle. The chevron
+   is drawn with clip-path rather than a glyph: the geometric arrows (U+25B8 and friends)
+   fall back to a symbol font on Windows, which rendered the collapsed and expanded states
+   as two different shapes. Two clip paths, one element, no font in the loop. Its track
+   placement lives with the rest of the grid above. */
+.tree__twisty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--twisty-w);
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  transition: color var(--fast), background var(--fast);
+}
+.tree__twisty:hover { color: var(--text); background: var(--border); }
+
+.tree__glyph-chevron {
+  width: 6px;
+  height: 10px;
+  background: currentColor;
+  clip-path: polygon(0 0, 1.8px 0, 6px 5px, 1.8px 10px, 0 10px, 4.2px 5px);
+}
+.tree__twisty.is-expanded .tree__glyph-chevron,
+.tree__row.is-expanded > .tree__twisty .tree__glyph-chevron {
+  width: 10px;
+  height: 6px;
+  clip-path: polygon(0 0, 10px 0, 10px 1.8px, 5px 6px, 0 1.8px);
+}
+/* Pressed feedback for the whole-row toggle: :active only fires on the arrow itself, so
+   the row's own press state drives the chevron instead. The tree re-renders on toggle,
+   which removes the class - no cleanup needed. */
+.tree__row--folder:active > .tree__twisty { background: var(--border); color: var(--text); }
+
+.tree__label {
+  min-width: 0;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+/* Only one of these ever sits in the trailing track of a given row: a folder's child
+   count, or the open note's age. */
+.tree__count {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-faint);
+  justify-self: end;
+}
+.tree__row:hover .tree__count { color: var(--text-muted); }
+
+.tree__when {
+  font-size: 11px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  justify-self: end;
+}
+
+/* A search hit names the workspace it lives in when that is not the open one. It shares the
+   trailing track with the age stamp above, and ui.js drops the stamp whenever this chip is
+   drawn, so only one of them is ever in that column. */
+.tree__ws {
+  grid-column: 4;
+  justify-self: end;
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--bg-sunken);
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+.tree__row:hover .tree__ws { background: var(--bg-active); color: var(--accent); }
+
+.tree__empty,
+.tree__hint {
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+/* A hint is not a row: it sits directly under the "All notes" break rather than adding a
+   second gap of its own above it, and it is prose rather than a placeholder. */
+.tree__hint { padding-top: 2px; font-style: normal; }
+/* Nested placeholders line up under the labels they stand in for: grid columns 1-3 plus
+   the two gaps, plus one indent step. */
+.tree__row--group-start.tree__empty {
+  padding-left: calc(var(--tree-inset) + var(--indent, 0px) + var(--twisty-w) + 20px + 12px);
+}
+.tree__empty { font-style: italic; opacity: 0.85; }
+.tree__empty.tree__row--group-start { margin-top: var(--tree-group); }
+
+/* ------------------------------------------------------- rail action bar
+   The rail's floor, and the busiest 90px in the app: it has to carry the two
+   create actions, the upload progress and a live storage readout without
+   becoming a second toolbar. Three decisions carry it:
+     1. One primary. "New note" is the only filled control; everything else in
+        the block is quiet until hovered, so the rail still reads as a tree with
+        a foot rather than a stack of buttons.
+     2. The action row is a grid, not two full-width stacks. Two 32px buttons
+        with their own icons fill the 272px content width exactly (1fr + 1fr),
+        which is what stops the block being 40% taller than it needs to be.
+     3. The storage line is data, not an action: it gets the mono face, tabular
+        figures, and a 3px meter tinted with the accent, and it opens the
+        database facts. A stat that looks like a button is a trap. */
+.sidebar__footer {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 10px 12px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.rail-actions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px; }
+/* The floor's closing line: the storage readout on its own. The trash used to close this
+   line; it now closes the corner of the workspace area, which is the surface it acts on. */
+
+/* Rail-scale buttons: pygmy variants of .btn, sized to the row height of the tree
+   above them so the block reads as part of the same surface. */
+.btn--rail { height: 30px; padding: 0 9px; font-size: 12px; gap: 6px; }
+.btn--rail .icon { font-size: 13.5px; opacity: 0.9; }
+.btn--rail.btn--primary .icon { opacity: 1; }
+
+.rail-storage {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* The whole line: the corner control that used to share it has moved to the pane. */
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 5px 4px 3px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-faint);
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--fast), color var(--fast);
+}
+.rail-storage:hover { background: var(--bg-hover); color: var(--text-muted); }
+.rail-storage__icon { flex: 0 0 auto; font-size: 13px; color: var(--text-faint); }
+.rail-storage__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  overflow: hidden;
+}
+.rail-storage__size {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 550;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+.rail-storage__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rail-storage__pct, .rail-storage__value {
+  flex: 0 0 auto;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 10.5px;
+}
+/* A share of the browser's quota is not a count, so the two states are drawn
+   differently: a count is printed, a percentage gets a 28px meter. */
+.rail-storage__meter {
+  flex: 0 0 auto;
+  position: relative;
+  width: 28px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--border-strong);
+  overflow: hidden;
+}
+.rail-storage__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+  background: var(--accent);
+}
+/* Past 4/5 of the quota the meter switches to the warning tone *and* the readout
+   changes colour, so the signal is never carried by colour alone. */
+.rail-storage--near .rail-storage__fill { background: var(--warning); }
+.rail-storage--near .rail-storage__pct { color: var(--warning); font-weight: 650; }
+
+.upload-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 4px;
+  font-size: 11.5px;
+  color: var(--accent);
+}
+/* Indeterminate progress: uploads report counts, not percentages, so a moving
+   bar is the honest affordance rather than a fake percentage fill. */
+.upload-status::after {
+  content: "";
+  flex: 1 1 auto;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  background-size: 60% 100%;
+  background-repeat: no-repeat;
+  animation: rail-sweep 1.2s linear infinite;
+}
+@keyframes rail-sweep {
+  from { background-position: -60% 0; }
+  to { background-position: 160% 0; }
+}
+
+/* ------------------------------------------------------------- card grid */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(216px, 1fr));
+  gap: 10px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 88px;
+  padding: 13px;
+  text-align: left;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: border-color var(--fast), box-shadow var(--fast), transform var(--fast);
+}
+.card:hover {
+  border-color: var(--border-strong);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+.card:active { transform: translateY(0); }
+.card.is-active { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+
+.card__glyph {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+}
+.card--folder {
+  background:
+    linear-gradient(180deg, var(--accent-soft), transparent 68%),
+    var(--bg-raised);
+}
+.card--folder .card__glyph { color: var(--accent); }
+
+.card__title {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.card__snippet {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.card__meta {
+  margin-top: auto;
+  padding-top: 4px;
+  font-size: 11px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------- editor */
+/* The editor fills the pane instead of growing past it, and the note body is the one part
+   that scrolls. That is what keeps the footer from having to float over the text: a pinned
+   footer covers the lines it is pinned above, and a half-covered line of a note reads as a
+   fragmented one. Here the footer is simply the row under the body, always in the same
+   place, and nothing can ever be underneath it. */
+.editor {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  max-width: 760px;
+  overflow-y: auto;
+}
+
+.editor__title {
+  width: 100%;
+  padding: 2px 0 12px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 26px;
+  font-weight: 660;
+  letter-spacing: -0.022em;
+  line-height: 1.2;
+  transition: border-color var(--fast);
+}
+.editor__title:focus { outline: none; border-bottom-color: var(--accent); }
+.editor__title::placeholder { color: var(--text-faint); }
+
+.editor__body {
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-top: 18px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 16px;
+  line-height: 1.72;
+  resize: none;
+  /* The note scrolls inside its own box: the pane has already given the editor exactly the
+     height it has, so a growing textarea would only push the footer off the bottom. */
+  overflow-y: auto;
+}
+.editor__body:focus { outline: none; }
+.editor__body::placeholder { color: var(--text-faint); }
+
+/* Editor footer: the last row of the editor, never over the note. Save state stays visible
+   without being pinned because the note body scrolls inside the box above it. */
+.editor__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  flex: 0 0 auto;
+  margin-top: 26px;
+  padding: 10px 0 12px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-canvas);
+}
+
+.editor__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 0;
+  font-size: 11.5px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The workspace trash control owns the pane's bottom-right corner while it is on
+   screen, so the editor's footer gives that corner up rather than letting its own
+   actions sit under the control. `:has()` keeps the reservation honest: with an empty
+   trash there is no control in the corner, and the footer keeps its full width. */
+.layout:has(> .trash-fab:not([hidden])) .editor__toolbar { padding-right: 68px; }
+/* Weighted separators instead of middle-dots: the dot is rationed. Drawn at 90% of
+   the text colour and kept inside the text item so a wrapped line can never open
+   with a dangling rule. */
+.editor__meta > span + span { position: relative; }
+.editor__meta > span + span::before {
+  content: "";
+  display: inline-block;
+  width: 1px;
+  height: 9px;
+  margin: 0 9px;
+  vertical-align: -1px;
+  background: color-mix(in srgb, var(--text-muted) 55%, transparent);
+}
+
+.editor__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--success);
+  font-weight: 600;
+}
+.editor__status::before {
+  content: "";
+  width: 5px; height: 5px;
+  border-radius: 999px;
+  background: currentColor;
+}
+/* "Unsaved…" and "Save failed" reuse the same dot, recoloured - one shape,
+   three states, so the footer never jumps. */
+.editor__status--dirty { color: var(--text-faint); }
+.editor__status--error { color: var(--danger); }
+
+.editor__buttons { display: flex; gap: 6px; flex: 0 0 auto; }
+
+/* -------------------------------------------------------- search results */
+.search-head {
+  padding: 2px 2px 12px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+.search-head strong { color: var(--text); font-weight: 600; }
+
+/* --------------------------------------------------------------- preview */
+.preview { max-width: 940px; }
+
+.preview__body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 280px;
+  margin: 6px 0 20px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-raised);
+  box-shadow: var(--shadow-sm);
+}
+
+.preview__image {
+  max-width: 100%;
+  max-height: 62vh;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+}
+
+.preview__placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  max-width: 34ch;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.preview__glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 54px; height: 54px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-sunken);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+}
+
+.preview__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* ----------------------------------------------------------- empty state */
+.empty-state {
+  margin-top: 20px;
+  padding: 32px 28px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--bg-raised);
+  text-align: center;
+  color: var(--text-muted);
+}
+.empty-state h2, .empty-state h3 {
+  color: var(--text);
+  margin-bottom: 6px;
+  font-size: 15px;
+  font-weight: 620;
+  letter-spacing: -0.01em;
+}
+.empty-state p { font-size: 13px; max-width: 44ch; margin: 0 auto; }
+
+.empty-state--big {
+  max-width: 520px;
+  margin: 64px auto 0;
+  padding: 44px 36px;
+}
+.empty-state--big h2 { font-size: 19px; letter-spacing: -0.017em; }
+.empty-state--big p { margin-top: 8px; }
+
+.empty-state__actions { display: flex; gap: 8px; justify-content: center; margin-top: 22px; }
+
+/* Centred mark for the whole-workspace empty state. */
+.empty-state__mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px; height: 46px;
+  margin-bottom: 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-sunken);
+  color: var(--accent);
+  font-size: 17px;
+  box-shadow: var(--shadow-sm);
+}
+
+.dialog__head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* The tinted tile is the whole tell for what kind of dialog this is: accent for a
+   normal ask, danger for something that destroys data. */
+.dialog__icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px; height: 36px;
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 19px;
+}
+.dialog--danger .dialog__icon {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.dialog__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding-top: 4px;
+  font-size: 15.5px;
+  font-weight: 650;
+  letter-spacing: -0.014em;
+  line-height: 1.35;
+}
+.dialog__close {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px; height: 28px;
+  margin: -3px -4px 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-faint);
+  font-size: 15px;
+  cursor: pointer;
+  transition: background var(--fast), color var(--fast);
+}
+.dialog__close:hover { background: var(--bg-hover); color: var(--text); }
+
+.dialog__body { padding: 14px 0 2px; }
+.dialog__body > * + * { margin-top: 13px; }
+
+/* Lead sentence of a confirm. */
+.dialog__message {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-muted);
+  max-width: 58ch;
+}
+.dialog__message strong { color: var(--text); font-weight: 620; }
+
+/* The concrete consequences, listed rather than buried in a sentence. */
+.dialog__consequences {
+  margin: 0;
+  padding: 12px 14px;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--danger);
+  border-radius: var(--radius-sm);
+  background: var(--bg-canvas);
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+.dialog__consequences li { position: relative; padding-left: 16px; }
+.dialog__consequences li + li { margin-top: 6px; }
+.dialog__consequences li::before {
+  content: "";
+  position: absolute;
+  left: 2px; top: 8px;
+  width: 4px; height: 4px;
+  border-radius: 999px;
+  background: var(--danger);
+}
+
+/* Type-to-confirm gate: the strong option, used only for the whole-database reset. */
+.dialog__gate { display: flex; flex-direction: column; gap: 8px; }
+.dialog__gate code {
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  background: var(--bg-sunken);
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text);
+  user-select: all;
+}
+
+.dialog__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  margin-top: 16px;
+}
+
+/* Sentence-case section headings: the rail already carries the only uppercase
+   micro-labels in the app, so the settings dialog does not repeat that rhythm. */
+.dialog__section { padding: 18px 0 0; border-top: 1px solid var(--border); margin-top: 18px; }
+.dialog__section:first-of-type { border-top: 0; margin-top: 4px; }
+.dialog__section h3 {
+  margin-bottom: 10px;
+  font-size: 13px;
+  font-weight: 620;
+  letter-spacing: -0.005em;
+  color: var(--text);
+}
+.dialog__section--danger h3 { color: var(--danger); }
+
+.dialog__note { margin-bottom: 14px; font-size: 12.5px; line-height: 1.6; color: var(--text-muted); max-width: 62ch; }
+.dialog__note code {
+  padding: 1px 5px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  background: var(--bg-sunken);
+  font-family: var(--mono);
+  font-size: 11.5px;
+}
+
+.info-list {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-canvas);
+  overflow: hidden;
+}
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 20px;
+  padding: 9px 12px;
+  font-size: 12.5px;
+}
+.info-row + .info-row { border-top: 1px solid var(--border); }
+.info-row__key { flex: 0 0 auto; color: var(--text-muted); }
+/* The value column can carry a second line (a consequence, not another fact), so it
+   wraps inside its own box instead of pushing the row layout around. */
+.info-row__col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  min-width: 0;
+  max-width: 60%;
+  text-align: right;
+}
+.info-row__val { font-weight: 600; font-variant-numeric: tabular-nums; }
+.info-row__hint { font-size: 11.5px; line-height: 1.45; color: var(--text-faint); }
+
+/* ------------------------------------------------------------ form fields */
+/* Label above, control, then helper or error text. Never placeholder-as-label. */
+.field { display: flex; flex-direction: column; gap: 6px; }
+
+.field__label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.004em;
+  color: var(--text);
+}
+
+.field__control { position: relative; display: flex; align-items: center; }
+
+.field__input {
+  width: 100%;
+  height: 34px;
+  padding: 0 11px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  color: var(--text);
+  font-size: 13px;
+  transition: border-color var(--fast), box-shadow var(--fast);
+}
+.field__input::placeholder { color: var(--text-faint); }
+.field__input:hover { border-color: var(--text-faint); }
+.field__input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+.field__input[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+.field__input[aria-invalid="true"]:focus {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 28%, transparent);
+}
+
+/* Error text carries an icon as well as the danger colour, so the state is never
+   signalled by colour alone. */
+.field__message {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-faint);
+}
+.field__message--error { color: var(--danger); }
+.field__message .icon { margin-top: 2px; font-size: 12px; }
+
+/* Two fields in one dialog body. The dialog spaces its own children, so a stack of fields
+   needs its own rhythm - otherwise the second label sits directly under the first input
+   and the pair reads as one four-line control. */
+.field-stack { display: flex; flex-direction: column; gap: 12px; }
+
+/* ------------------------------------------------------------- vault / security */
+/* The action row under the Security section. Same button language as everywhere else;
+   this only says where the buttons sit. */
+.vault-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* The lock notice: what stands where encrypted content would have been drawn - the editor,
+   a file preview. Centred and quiet, because it is a state of the pane rather than an
+   error, and it carries the one action that leaves it. */
+.lock-notice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  max-width: 520px;
+  margin: 56px auto 0;
+  padding: 40px 32px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--bg-raised);
+  text-align: center;
+  color: var(--text-muted);
+}
+.lock-notice__mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px; height: 46px;
+  margin-bottom: 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-sunken);
+  color: var(--accent);
+  box-shadow: var(--shadow-sm);
+}
+.lock-notice h2 {
+  color: var(--text);
+  font-size: 17px;
+  font-weight: 620;
+  letter-spacing: -0.014em;
+}
+.lock-notice p { font-size: 13px; line-height: 1.6; max-width: 46ch; }
+.lock-notice .btn { margin-top: 8px; }
+/* Damage is not the same message as locked, so it does not get the same tile: the accent
+   mark says "there is a way in", and here there is not. */
+.lock-notice--damaged .lock-notice__mark {
+  border-color: color-mix(in srgb, var(--danger) 34%, transparent);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+/* Indeterminate-versus-measured: the vault conversions know how many records there are, so
+   this one fills. It is deliberately not the sweeping upload rail, which reports counts
+   rather than a fraction. */
+.progress-block { display: flex; flex-direction: column; gap: 10px; }
+.progress {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--bg-sunken);
+  overflow: hidden;
+}
+.progress__bar {
+  width: 0;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+  transition: width var(--fast);
+}
+
+/* -------------------------------------------------------------- select */
+/* A native <select> stays in the DOM as the real form control; the button and
+   listbox are the visible surface. Positioning is set from the wrapper. */
+.select { position: relative; min-width: 0; }
+.select__native {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0);
+  white-space: nowrap; border: 0;
+}
+
+.select__trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 550;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: border-color var(--fast), box-shadow var(--fast), background var(--fast);
+}
+.select__trigger:hover { border-color: var(--border-strong); }
+.select__trigger[aria-expanded="true"] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.select__value {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.select__chevron {
+  flex: 0 0 auto;
+  color: var(--text-faint);
+  font-size: 14px;
+  transition: transform var(--slow);
+}
+.select__trigger[aria-expanded="true"] .select__chevron { transform: rotate(180deg); }
+
+.select__list {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 5px);
+  left: 0;
+  min-width: 100%;
+  max-width: min(320px, 80vw);
+  max-height: 260px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  box-shadow: var(--shadow-md);
+  animation: pop-in 120ms var(--ease);
+}
+@keyframes pop-in {
+  from { opacity: 0; transform: translateY(-3px); }
+  to { opacity: 1; transform: none; }
+}
+
+.select__option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+}
+.select__option + .select__option { margin-top: 1px; }
+.select__option.is-active { background: var(--bg-hover); }
+.select__option[aria-selected="true"] { font-weight: 600; background: var(--bg-active); }
+.select__option-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.select__option-check {
+  flex: 0 0 auto;
+  color: var(--accent);
+  font-size: 14px;
+  opacity: 0;
+}
+.select__option[aria-selected="true"] .select__option-check { opacity: 1; }
+
+/* ------------------------------------------- workspace switcher (compact) */
+/* A select with a leading glyph and a transparent, borderless trigger, for the
+   rail header where a boxed control would compete with the tree. */
+.select--rail .select__trigger {
+  padding-left: 8px;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+.select--rail .select__trigger:hover { background: var(--bg-hover); }
+.select--rail .select__trigger[aria-expanded="true"] {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+.select__lead { flex: 0 0 auto; color: var(--text-faint); font-size: 15px; }
+
+/* ---------------------------------------------------------------- toasts */
+/* A notification, not a panel: one plain line of text, centred at the top of the work area,
+   below the header rather than over the search field it would otherwise cover. No border, no
+   accent stripe, no dismiss control - it arrives, is read, and leaves on its own timer. */
+.toast-host {
+  position: fixed;
+  top: calc(var(--topbar-h) + 16px);
+  left: 50%;
+  right: auto;
+  bottom: auto;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  /* The highest index in the app, above the menus' 130 - and, through the popover attribute the
+     host carries, above a modal dialog's backdrop as well, which no z-index can reach. */
+  z-index: 1000;
+  max-width: min(560px, calc(100vw - 32px));
+  /* Nothing in a toast is clickable, so it must not swallow a click aimed at the app
+     underneath it. */
+  pointer-events: none;
+  /* A popover arrives with a box model of its own: a border, a background, padding, inset 0 and
+     a margin of auto. None of it belongs on this surface, so all of it is cleared. */
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  overflow: visible;
+  width: auto;
+  height: auto;
+}
+
+.toast {
+  padding: 9px 14px;
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  box-shadow: var(--shadow-sm);
+  color: var(--text);
+  font-size: 12.5px;
+  line-height: 1.5;
+  text-align: center;
+  animation: toast-in var(--slow);
+}
+.toast--out { opacity: 0; transform: translateY(-4px); transition: opacity 160ms var(--ease), transform 160ms var(--ease); }
+
+.toast__msg { display: block; }
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ------------------------------------------------------------- narrow view */
+/* The component share of the narrow breakpoint. These rules sit here, and not
+   with the frame rules in layout.css, because a media query adds no
+   specificity: an earlier copy of them was overridden by the very base rules
+   they were written to replace. They keep the same place in the cascade they
+   had in the single stylesheet this port came from. */
+@media (max-width: 820px) {
+  .tree__row { min-height: 38px; }
+  .tree__label { font-size: 14px; }
+  .sidebar__footer { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+
+  .editor__title { font-size: 22px; }
+  /* No floor: the body takes whatever the pane leaves it and scrolls inside that. */
+  .editor__body { min-height: 0; }
+
+  /* The header keeps its height: the task count stays, its label goes. The badge carries
+     the only part of the button that changes, and a long label would push the search field
+     out of the way at this width. */
+  .view-btn { padding: 0 8px; }
+  .view-btn__label { display: none; }
+
+  /* One line of provenance, truncated rather than wrapped, so the toolbar stays a
+     predictable height while writing and the actions keep their place. */
+  .editor__toolbar { flex-wrap: nowrap; gap: 10px; }
+  .editor__meta { flex-wrap: nowrap; min-width: 0; overflow: hidden; }
+  .editor__meta > span + span::before { margin: 0 7px; }
+  .editor__meta-when { display: none; }
+
+  .card-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+  .pane-head__title { font-size: 18px; }
+
+  .menu { min-width: 216px; }
+  .menu__item { min-height: 40px; }
+}
+
+@media (max-width: 420px) {
+  .card-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ==========================================================================
+   Trash - a fullscreen panel
+   Not a popup: recovering data is a browsing task (scan the list, pick several
+   things, act on them), and a 480px card in the middle of the screen is the
+   wrong shape for browsing. Same <dialog> element as every other dialog, so it
+   still owns focus trapping, Escape and scroll lock.
+   ========================================================================== */
+.dialog--full {
+  /* The <dialog> stays the full viewport: it owns the backdrop, the focus trap, Escape
+     and the scroll lock, and those contracts belong to the browser, not to a card. It
+     paints nothing of its own, though - the surface is the panel inside it. That is
+     what leaves no frame, band or hairline outside the surface to read as leftover
+     chrome, and it is why the panel's own inset is the only edge on screen. */
+  width: 100vw;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+
+  /* Three numbers carry the whole panel. The measure is the reading column; the inset
+     is the air between the surface and the viewport edge; the pad is the panel's own
+     internal margin, stated once so the header, toolbar, list and footer all land on
+     one column. */
+  --panel-measure: 940px;
+  --panel-pad: 22px;
+  --panel-inset: 32px;
+}
+/* The shell's body is the only thing that positions the panel: it centres it, insets it
+   from every edge, and lets it take the rest of the height. */
+.dialog--full .dialog__body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: var(--panel-inset);
+  background: transparent;
+}
+.dialog--full .dialog__form { flex: 1 1 auto; min-height: 0; padding: 0; }
+
+/* The surface. One rounded, bounded card, and every band lives inside it - so the
+   panel is the only thing on screen with a shape, and a row is never stretched across a
+   monitor the card does not cover. */
+.panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  /* The measure plus the panel's own padding, and the 2px of hairline borders - which
+     sit outside the reading column, so the column stays exactly the app's 940px. */
+  max-width: calc(var(--panel-measure) + 2 * var(--panel-pad) + 2px);
+  margin: 0 auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-raised);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+
+/* The one place the uppercase micro-label returns: the panel has more structure
+   than a 480px prompt, and these headings are the map. */
+.panel__head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px var(--panel-pad);
+  border-bottom: 1px solid var(--border);
+}
+.panel__tile {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px; height: 36px;
+  border-radius: var(--radius);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 19px;
+}
+.panel__heading { flex: 1 1 auto; min-width: 0; }
+.panel__title {
+  font-size: 15.5px;
+  font-weight: 650;
+  letter-spacing: -0.014em;
+  line-height: 1.3;
+}
+.panel__sub {
+  margin-top: 1px;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The panel's exit. The shell around the panel draws no header, so this is the only
+   close control on screen - which is why it is not a bare cross: it wears the app's
+   button clothes, says what it does, and names the key that does the same thing. */
+.panel__close {
+  flex: 0 0 auto;
+  height: 32px;
+  padding: 0 12px 0 10px;
+  background: var(--bg-sunken);
+  color: var(--text);
+}
+.panel__close .icon { color: var(--text-muted); }
+.panel__close:hover .icon { color: var(--text); }
+
+/* Toolbar: select-all, filters, search. Its own band, with the hairline doing the
+   work so the list below can start immediately. */
+.panel__tools {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px var(--panel-pad);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-canvas);
+}
+.panel__sep { flex: 0 0 auto; width: 1px; height: 18px; background: var(--border); }
+.panel__spacer { flex: 1 1 auto; min-width: 0; }
+
+/* A framed search field at panel scale - the top bar's 34px pill would be a
+   toy in a fullscreen panel. */
+.search-field { position: relative; flex: 0 0 auto; width: 244px; }
+.search-field .icon {
+  position: absolute;
+  left: 10px; top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-faint);
+  font-size: 14px;
+  pointer-events: none;
+}
+.search-field input {
+  width: 100%;
+  height: 32px;
+  padding: 0 10px 0 30px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  color: var(--text);
+  font-size: 12.5px;
+  transition: border-color var(--fast), box-shadow var(--fast);
+}
+.search-field input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+.search-field input::placeholder { color: var(--text-faint); }
+.search-field input::-webkit-search-cancel-button { -webkit-appearance: none; }
+
+.panel__list { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0 var(--panel-pad) 24px; }
+
+/* Group heading. Sticky, because a 60-row list is scannable only if you can see
+   which section you are in - and it paints its own background so rows scroll
+   underneath it rather than through it. */
+.panel__group {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0 6px;
+  padding: 6px 0;
+  background: var(--bg-raised);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.panel__group-count { font-family: var(--mono); font-variant-numeric: tabular-nums; letter-spacing: 0; }
+.panel__group::after {
+  content: "";
+  flex: 1 1 auto;
+  height: 1px;
+  background: var(--border);
+}
+
+.trash-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 26px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 46px;
+  padding: 7px 10px 7px 6px;
+  border-radius: var(--radius);
+  transition: background var(--fast);
+}
+.trash-row + .trash-row { margin-top: 1px; }
+.trash-row:hover { background: var(--bg-hover); }
+/* Selected rows carried the accent-tinted fill and the same 2px leading bar the
+   tree uses, so "chosen" looks identical on both surfaces. */
+.trash-row.is-selected { background: var(--bg-active); }
+.trash-row.is-selected::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 8px; bottom: 8px;
+  width: 2px;
+  border-radius: 999px;
+  background: var(--accent);
+}
+.trash-row:focus-within { background: var(--bg-hover); }
+
+.trash-row__glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px; height: 26px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-sunken);
+  color: var(--text-muted);
+  font-size: 14px;
+}
+.trash-row.is-selected .trash-row__glyph { background: var(--bg-raised); color: var(--accent); }
+/* A file keeps its type pill here too - the same glyph the tree shows, so an item
+   is recognisable in the trash without reading its name. */
+.trash-row__glyph--file {
+  font-family: var(--font);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-indent: 0.03em;
+}
+
+.trash-row__text { min-width: 0; }
+.trash-row__name {
+  display: block;
+  font-size: 13px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.trash-row.is-selected .trash-row__name { font-weight: 620; }
+.trash-row__meta {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.trash-row__meta > * { overflow: hidden; text-overflow: ellipsis; }
+/* Weighted separators, matching the editor's provenance line: a hairline rule
+   rather than a middle dot, which is rationed in this interface. Each rule lives
+   on the *next* item's leading padding - as a `::before` it became an anonymous
+   flex item and an extra gap opened on the first one. */
+.trash-row__meta > * + * {
+  position: relative;
+  padding-left: 15px;
+}
+.trash-row__meta > * + *::before {
+  content: "";
+  position: absolute;
+  left: 7px; top: 50%;
+  width: 1px;
+  height: 9px;
+  margin-top: -4px;
+  background: color-mix(in srgb, var(--text-muted) 45%, transparent);
+}
+
+.trash-row__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity var(--fast);
+}
+/* Revealed on hover, on keyboard focus, and permanently once the row is part of
+   a selection - otherwise the actions for a multi-row operation would be
+   invisible on every row but the one under the cursor. */
+.trash-row:hover .trash-row__actions,
+.trash-row:focus-within .trash-row__actions,
+.trash-row.is-selected .trash-row__actions { opacity: 1; }
+@media (hover: none) {
+  .trash-row__actions { opacity: 1; }
+}
+
+/* ---------------------------------------------------------- panel footer */
+.panel__foot {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px var(--panel-pad);
+  border-top: 1px solid var(--border);
+  background: var(--bg-canvas);
+}
+.panel__count {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.panel__count strong { color: var(--text); font-weight: 620; }
+.panel__count--has strong { color: var(--accent); }
+
+/* ------------------------------------------------------- trash empty state */
+.trash-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+  max-width: 42ch;
+  margin: 72px auto 0;
+  text-align: center;
+  color: var(--text-muted);
+}
+.trash-empty__mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px; height: 46px;
+  margin-bottom: 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-sunken);
+  color: var(--text-faint);
+  font-size: 19px;
+}
+.trash-empty h3 { font-size: 15px; font-weight: 620; letter-spacing: -0.01em; color: var(--text); }
+.trash-empty p { font-size: 13px; line-height: 1.6; }
+
+/* Narrow screens: the panel keeps its insets, they just tighten - below the measure
+   plus its padding the card is simply the viewport minus the inset, and the bands get
+   a tighter gutter. On a phone the toolbar wraps instead of squeezing the filters, and
+   a row grows to a touch target with its actions permanently visible, because there is
+   no hover to reveal them.
+   This block sits *after* the panel rules it modifies on purpose. A media query
+   adds no specificity, so an earlier copy of these rules - which is where they
+   used to live - was overridden by the very base rules they were written to
+   replace, and every padding, gap and flex-wrap declaration in it was inert. */
+@media (max-width: 820px) {
+  .dialog--full { --panel-pad: 14px; --panel-inset: 12px; }
+  .panel__head { padding: 12px var(--panel-pad); }
+  .panel__sub { display: none; }
+  .panel__tools { flex-wrap: wrap; gap: 8px; }
+  .panel__sep { display: none; }
+  .search-field { width: 100%; order: 3; }
+  .panel__list { padding: 0 var(--panel-pad) 20px; }
+  .panel__foot { flex-wrap: wrap; padding: 10px var(--panel-pad) max(10px, env(safe-area-inset-bottom)); }
+  .panel__count { flex: 1 0 100%; }
+  .panel__foot .btn { flex: 1 1 auto; }
+
+  .trash-row { min-height: 54px; grid-template-columns: auto 26px minmax(0, 1fr); }
+  .trash-row__actions { grid-column: 1 / -1; justify-content: flex-end; opacity: 1; }
+  .trash-row__meta { flex-wrap: wrap; white-space: normal; }
+}
+
+/* ==========================================================================
+   Micro controls
+   Checkboxes, radios and the segmented group. Each one is a real form control
+   wearing the app's clothes: the input keeps the keyboard contract, the
+   accessibility tree and the `:checked` state, and CSS paints the box.
+   ========================================================================== */
+.checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+.checkbox--bare { gap: 0; }
+/* Visually hidden but focusable - `display: none` would take the control out of
+   the tab order and off the accessibility tree entirely. */
+.checkbox__input,
+.segmented__input {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0);
+  white-space: nowrap; border: 0;
+}
+.checkbox__box {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px; height: 17px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xs);
+  background: var(--bg-raised);
+  color: transparent;
+  transition: background var(--fast), border-color var(--fast), color var(--fast);
+}
+.checkbox__box .icon { font-size: 12px; stroke-width: 2.4; }
+.checkbox:hover .checkbox__box { border-color: var(--accent); }
+.checkbox__input:checked + .checkbox__box {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--text-inverse);
+}
+/* Indeterminate (select-all with a partial selection) is a dash, not a tick:
+   it has to be distinguishable from "all of them" at a glance. */
+.checkbox__input:indeterminate + .checkbox__box {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--text-inverse);
+}
+.checkbox__input:indeterminate + .checkbox__box .icon { display: none; }
+.checkbox__input:indeterminate + .checkbox__box::after {
+  content: "";
+  width: 9px; height: 2px;
+  border-radius: 1px;
+  background: currentColor;
+}
+.checkbox__input:focus-visible + .checkbox__box {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.checkbox__input:disabled + .checkbox__box { opacity: 0.5; }
+.checkbox__label { font-size: 12.5px; color: var(--text-muted); }
+.checkbox:hover .checkbox__label { color: var(--text); }
+
+.segmented {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-sunken);
+}
+.segmented__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 550;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--fast), color var(--fast), box-shadow var(--fast);
+}
+.segmented__item:hover { color: var(--text); }
+.segmented__item:has(.segmented__input:checked) {
+  background: var(--bg-raised);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+.segmented__item:has(.segmented__input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.segmented__icon { display: inline-flex; font-size: 14px; }
+.segmented__badge {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 10.5px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: var(--bg-hover);
+  color: var(--text-faint);
+}
+.segmented__item:has(.segmented__input:checked) .segmented__badge {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.segmented__input:disabled + .segmented__icon,
+.segmented__input:disabled ~ .segmented__label { opacity: 0.5; }
+
+/* ==========================================================================
+   Palette chooser
+   Six named chips in the settings dialog. The chip is its own label: the dot is
+   the palette's accent, drawn from the fixed swatch tokens rather than from the
+   live --accent, because a chooser whose options repaint themselves as you pick
+   one is unreadable exactly when you want to compare them.
+   ========================================================================== */
+.palette-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.palette-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 11px 6px 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-canvas);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 550;
+  cursor: pointer;
+  user-select: none;
+  transition: background var(--fast), border-color var(--fast), color var(--fast);
+}
+.palette-option:hover { border-color: var(--border-strong); color: var(--text); }
+/* :has() rather than the adjacent-sibling selector the segmented group uses: the
+   input has to come first in the markup for the label to wrap it, so there is no
+   single sibling that means "checked" for every element that has to react. */
+.palette-option:has(.palette-option__input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text);
+}
+.palette-option:has(.palette-option__input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+/* Visually hidden but still a real radio: `display: none` would drop the whole
+   group out of the tab order and off the accessibility tree, taking arrow-key
+   navigation and the checked state with it. */
+.palette-option__input {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0);
+  white-space: nowrap; border: 0;
+}
+.palette-option__dot {
+  flex: 0 0 auto;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  /* A ring rather than a border, so the two dots that sit closest to the light
+     surfaces keep a defined edge without the dark chip growing a pale outline. */
+  box-shadow: 0 0 0 1px var(--border-strong);
+}
+.palette-option__dot--indigo { background: var(--palette-indigo-swatch); }
+.palette-option__dot--teal { background: var(--palette-teal-swatch); }
+.palette-option__dot--amber { background: var(--palette-amber-swatch); }
+.palette-option__dot--rose { background: var(--palette-rose-swatch); }
+.palette-option__dot--violet { background: var(--palette-violet-swatch); }
+.palette-option__dot--graphite { background: var(--palette-graphite-swatch); }
+
+/* ==========================================================================
+   Context menu
+   The app's answer to right-click. One reused root element, positioned in the
+   viewport rather than appended to the element that opened it, so it cannot be
+   clipped by the rail's `overflow: hidden` or the panel's scroll container.
+   ========================================================================== */
+.menu {
+  position: fixed;
+  /* Above every dialog: inside a dialog the menu is a child of it, and outside one it has
+     to clear the panel it was opened from. */
+  z-index: 130;
+  min-width: 208px;
+  max-width: min(320px, calc(100vw - 16px));
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  box-shadow: var(--shadow-lg);
+  animation: menu-in 110ms var(--ease);
+}
+@keyframes menu-in {
+  from { opacity: 0; transform: translateY(-4px) scale(0.985); }
+  to { opacity: 1; transform: none; }
+}
+.menu__title {
+  padding: 6px 9px 5px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.menu__item {
+  display: grid;
+  grid-template-columns: 14px 16px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 30px;
+  padding: 5px 9px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text);
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+.menu__item + .menu__item { margin-top: 1px; }
+/* The sort menu's items carry no glyph - a sort key has no icon of its own - but the grid
+   above reserves a column for one, and a missing child shifts the label into that 16px
+   column, where it is clipped to an ellipsis. An item that really has no icon drops it. */
+.menu__item:not(:has(.menu__icon)) { grid-template-columns: 14px minmax(0, 1fr) auto; }
+.menu__item:hover, .menu__item:focus-visible {
+  background: var(--bg-hover);
+  outline: none;
+}
+.menu__item:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
+.menu__item.is-disabled { color: var(--text-faint); cursor: default; }
+.menu__item.is-disabled:hover { background: none; }
+.menu__item--danger { color: var(--danger); }
+.menu__item--danger:hover, .menu__item--danger:focus-visible { background: var(--danger-soft); }
+.menu__check { display: inline-flex; color: var(--accent); font-size: 13px; }
+.menu__item--danger .menu__check { color: var(--danger); }
+.menu__icon { display: inline-flex; color: var(--text-faint); font-size: 14px; }
+.menu__item:hover .menu__icon { color: var(--text-muted); }
+.menu__item--danger .menu__icon, .menu__item--danger:hover .menu__icon { color: var(--danger); }
+.menu__label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The shortcut doubles as the sort menu's trailing hint (an arrow, or a right-aligned
+   note), so it is pushed to the trailing edge however long the label before it is. */
+.menu__shortcut {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+  color: var(--text-faint);
+}
+.menu__sep { height: 1px; margin: 4px 6px; background: var(--border); }
+
+/* A drop target that highlights has to keep the cursor honest: the tree row and
+   the card both become drop targets while a file is being dragged. */
+.tree__row.is-drop-target,
+.card.is-drop-target {
+  background: var(--bg-active);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  .upload-status::after { animation: none; background: var(--accent); }
+  .tree__twisty { transition: none; }
+  .menu { animation: none; }
+}
+
+/* ==========================================================================
+ Tasks pane
+
+ The task list is assembled from elements the rest of the app already has: the same
+ pane head, the same 940px measure, the same row rhythm and the same hairline
+ separators as the tree and the trash. Three things are its own, and each exists
+ because a task is not a note: a checkbox leads every row, a due chip carries the
+ tone of the bucket heading above it, and the quick-add row is a field rather than
+ a button. Every colour below is a token, so the pane follows the palette and the
+ mode without a single rule of its own - which is why there is no dark variant here.
+ ========================================================================== */
+
+/* The header's task button. The task list is a view of the workspace rather than a place
+   inside it, so it belongs with the view-level controls at the right end of the header, not
+   among the rail's rows, which are what the notebook holds. It is the one control up there
+   that is not a bare icon: the number of open tasks is the reason to look at it, so it wears
+   a short label and a count and reads as a button in its own right. */
+.topbar__views { display: flex; align-items: center; }
+
+.view-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 550;
+  line-height: 1;
+  cursor: pointer;
+  user-select: none;
+  transition: background var(--fast), color var(--fast), transform 60ms var(--ease);
+}
+.view-btn:hover { background: var(--bg-hover); color: var(--text); }
+.view-btn:active { transform: translateY(1px); }
+.view-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.view-btn__glyph { color: var(--text-muted); }
+.view-btn__label { white-space: nowrap; }
+/* The count wears the tree's badge rather than a badge of its own: two ways of printing a
+   number in this app would be two languages. */
+.view-btn .tree__badge { margin-left: 0; }
+/* Active is the app's selected treatment, unchanged: the same pill and the same accent glyph
+   a folder row gets, because the tasks pane IS the pane on screen. */
+.view-btn.is-active { background: var(--bg-active); color: var(--text); }
+.view-btn.is-active .view-btn__label { font-weight: 620; }
+.view-btn.is-active .view-btn__glyph { color: var(--accent); }
+
+/* One measure, shared with the folder view: the head, the quick add, the filter and
+   every group line up on the same optical column as the cards beside them. */
+.task-add,
+.task-filters,
+.task-group { max-width: 940px; }
+
+.task-add {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 20px;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  box-shadow: var(--shadow-sm);
+  transition: border-color var(--fast), box-shadow var(--fast);
+}
+/* The field is the pane's primary way in, so it takes the accent ring the app's own
+   focused inputs take, rather than a bare outline of its own invention. */
+.task-add:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+.task-add__glyph { display: inline-flex; color: var(--text-faint); }
+.task-add:focus-within .task-add__glyph { color: var(--accent); }
+.task-add__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 13.5px;
+}
+.task-add__input:focus { outline: none; }
+.task-add__input::placeholder { color: var(--text-faint); }
+/* A real button at the end of the field: the hand's way to do what Enter does. Quiet while
+   there is nothing to file - a control that files nothing is worse than one that is plainly
+   not ready - and it answers the pointer when there is. */
+.task-add__submit {
+  flex: 0 0 auto;
+  height: 26px;
+  padding: 0 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-raised);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--fast), color var(--fast), border-color var(--fast), opacity var(--fast);
+}
+.task-add__submit:hover:not(:disabled) { background: var(--bg-hover); border-color: var(--border-strong); }
+.task-add__submit:active:not(:disabled) { transform: translateY(1px); }
+.task-add__submit:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.task-add__submit:disabled { opacity: 0.45; cursor: default; }
+
+.task-filters { display: flex; margin: 14px 0 0; }
+.task-filters__group { flex-wrap: wrap; }
+
+.task-group { margin-top: 4px; }
+/* The heading is the pane's own section label, so its rhythm comes from .pane-section;
+   the first group only has to clear the filter above it. */
+.task-group:first-of-type .pane-section { margin-top: 18px; }
+
+.task-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+  padding: 6px 8px 6px 6px;
+  border-radius: var(--radius);
+  transition: background var(--fast);
+}
+.task-row + .task-row { margin-top: 1px; }
+.task-row:hover, .task-row:focus-within { background: var(--bg-hover); }
+
+.task-row__check { grid-column: 1; }
+.task-row__text {
+  grid-column: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.task-row__title {
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-xs);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.task-row__title:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* A finished task is struck through as well as dimmed: the tick is the state, and the
+   strike is what makes it legible while the eye is running down a long list. */
+.task-row.is-done .task-row__title { color: var(--text-faint); text-decoration: line-through; }
+
+.task-row__meta {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  white-space: nowrap;
+}
+/* Weighted separators, matching the trash row's metadata line: a hairline rule rather
+   than a middle dot, which is rationed in this interface. Each rule lives on the next
+   item's leading padding - as a ::before on the item itself it became an anonymous flex
+   item and opened an extra gap on the first one. */
+.task-row__meta > * + * { position: relative; padding-left: 13px; }
+.task-row__meta > * + *::before {
+  content: "";
+  position: absolute;
+  left: 6px; top: 50%;
+  width: 1px;
+  height: 9px;
+  margin-top: -4px;
+  background: color-mix(in srgb, var(--text-muted) 45%, transparent);
+}
+
+.task-chip { overflow: hidden; text-overflow: ellipsis; }
+/* A due chip's tone follows the bucket heading above it, so the two can never appear to
+   disagree: late is the danger tone, today and tomorrow are the accent, and everything
+   still ahead of the reader stays plain. */
+.task-chip--overdue { color: var(--danger); }
+.task-chip--today, .task-chip--tomorrow { color: var(--accent); }
+
+/* High priority is the attention tone, not the danger tone: something late and something
+   important are different claims, and painting both red would flatten them into one. */
+.task-row__priority {
+  grid-column: 3;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--bg-sunken);
+  color: var(--warning);
+  font-size: 10.5px;
+  font-weight: 620;
+  letter-spacing: 0.03em;
+}
+
+.task-row__actions {
+  grid-column: 4;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity var(--fast);
+}
+.task-row:hover .task-row__actions,
+.task-row:focus-within .task-row__actions { opacity: 1; }
+@media (hover: none) {
+  .task-row__actions { opacity: 1; }
+}
+.task-row__action--danger:hover { background: var(--danger-soft); color: var(--danger); }
+
+/* The edit dialog's form: two columns for the four short facts, one column for the text,
+   so the dialog keeps the proportions of every other form in the app instead of becoming
+   a ladder of full-width fields. */
+.task-form { display: flex; flex-direction: column; gap: 14px; }
+.task-form__row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.task-form .select,
+.task-form .select__trigger { width: 100%; }
+.task-form__when { gap: 10px; }
+/* A textarea is the one control that does not take the field's fixed height: it is a
+   body of text, and the field heights in this app are for single lines. */
+.field__input--area {
+  height: auto;
+  min-height: 64px;
+  padding: 8px 11px;
+  font-family: var(--font);
+  line-height: 1.5;
+  resize: vertical;
+}
+
+@media (max-width: 560px) {
+  /* The four short facts pair up only while there is width for two columns; stacked,
+     they are read one after another in the order the task is described. */
+  .task-form__row { grid-template-columns: 1fr; }
+  .task-row { gap: 8px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  .upload-status::after { animation: none; background: var(--accent); }
+  .tree__twisty { transition: none; }
+  .menu { animation: none; }
+}
