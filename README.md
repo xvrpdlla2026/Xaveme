@@ -37,6 +37,10 @@ npm run dev
 Open http://127.0.0.1:8000 and create an account. For a production build, `npm run build`
 writes the compiled assets to `public/build` and `php artisan serve` picks them up.
 
+`php artisan serve` answers one request at a time, so a screen that loads several
+resources at once queues them and looks slow. Set `PHP_CLI_SERVER_WORKERS=4` in `.env`
+before serving to give the dev server a few workers.
+
 To point the app at MySQL instead, set `DB_CONNECTION=mysql` and the `DB_*` values in `.env`
 and run `php artisan migrate` again. Nothing in the application code is SQLite specific.
 
@@ -69,6 +73,10 @@ stored beside the data, and note content is sealed with AES-GCM into an `enc:v1:
 before it is ever sent. The server stores the envelope, the salt, the iteration count and one
 sealed known string it can neither read nor forge. Losing the passphrase means losing those
 notes, by design.
+
+Attachment bytes are a known exception: they are uploaded and stored as they are, and the
+vault does not cover them. The upload path says so in the record it writes rather than
+labelling them sealed.
 
 ## Attachments
 
