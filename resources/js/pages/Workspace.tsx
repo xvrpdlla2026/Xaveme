@@ -1034,6 +1034,12 @@ export default function Workspace(): JSX.Element {
   const workspace = workspaces.find((entry) => entry.id === workspaceId) ?? null;
   const searching = search.trim().length > 0;
   const locked = vault === "locked";
+  // With nothing open the page draws an empty state of its own, and the attachments pane draws
+  // one as well. The two landed stacked on a workspace that holds nothing, both offering Upload
+  // file and both explaining the same drop target. They are now exclusive: this page's card is
+  // the one for a workspace with nothing in it at all, and the pane's is the one for everything
+  // else, which is also the only card that can name the folder it is talking about.
+  const workspaceEmpty = notes.length === 0 && folders.length === 0 && attachments.length === 0;
 
   const onPickFile = (): void => {
     uploadFolder.current = targetFolder();
@@ -1209,7 +1215,7 @@ export default function Workspace(): JSX.Element {
                   : "Folders, notes and files are on their way."}
               </p>
             </div>
-          ) : (
+          ) : workspaceEmpty ? (
             <EmptyState
               big
               mark="NB"
@@ -1229,12 +1235,13 @@ export default function Workspace(): JSX.Element {
                 </>
               }
             />
-          )}
+          ) : null}
 
           {view === "notes" && !activeNote && !activeAttachment ? (
             <AttachmentsPanel
               workspaceId={workspaceId ?? ""}
               folderId={selection.type === "folder" ? selection.id : null}
+              showEmptyState={!workspaceEmpty}
             />
           ) : null}
         </main>

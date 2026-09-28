@@ -24,7 +24,22 @@ import type { Attachment, Folder } from "../types";
 /** What the input accepts. The server enforces the same list, and a rejected file says so. */
 const ACCEPT = "image/*,.pdf,.txt,.md,.docx,.doc,.csv,.json,.zip";
 
-export function AttachmentsPanel({ workspaceId, folderId }: { workspaceId: string; folderId: string | null }) {
+export function AttachmentsPanel({
+  workspaceId,
+  folderId,
+  showEmptyState,
+}: {
+  workspaceId: string;
+  folderId: string | null;
+  /**
+   * Whether the pane's own empty state is the one the reader should see. The page draws a card
+   * of its own when the workspace holds nothing at all, and that card already offers both
+   * things this one does, so on a workspace that empty this pane draws no second card and
+   * simply waits for the first file. Every other case keeps it: with something in the
+   * workspace, this is the only card that can name the folder it is about.
+   */
+  showEmptyState: boolean;
+}) {
   const { toast } = useToast();
   const picker = useRef<HTMLInputElement | null>(null);
   const [rows, setRows] = useState<Attachment[]>([]);
@@ -228,7 +243,7 @@ export function AttachmentsPanel({ workspaceId, folderId }: { workspaceId: strin
         </div>
       ) : null}
 
-      {loading ? null : rows.length ? (
+      {loading || !showEmptyState ? null : rows.length ? (
         <>
           <h3 className="pane-section">
             <span>Files</span>
