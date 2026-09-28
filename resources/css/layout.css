@@ -206,32 +206,6 @@
 .sidebar__sort[aria-expanded="true"] { background: var(--bg-hover); color: var(--text); }
 .sidebar__sort.is-manual { color: var(--accent); }
 
-/* The rail's own way into the trash, on the footer floor under the action pair.
-   It is a `.btn--rail` in everything but name: same 30px height, same transparent
-   border, same muted ink that answers the pointer. Written out rather than added
-   to the markup because the port's rule set is the contract here. */
-.rail-trash {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  width: 100%;
-  height: 30px;
-  padding: 0 9px;
-  border: 1px solid transparent;
-  border-radius: var(--radius);
-  background: none;
-  color: var(--text-muted);
-  font-size: 12px;
-  font-weight: 550;
-  cursor: pointer;
-  transition: background var(--fast), color var(--fast);
-}
-.rail-trash .icon { font-size: 13.5px; opacity: 0.9; }
-.rail-trash:hover { background: var(--bg-hover); color: var(--text); }
-.rail-trash:active { transform: translateY(1px); }
-.rail-trash:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-
 /* -------------------------------------------------- workspace trash control */
 /* The trash: a round control that closes the workspace area's bottom-right corner -
    the edge the eye leaves the pane through, on the surface the control acts on.

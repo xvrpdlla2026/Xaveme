@@ -1249,7 +1249,7 @@ export default function Workspace(): JSX.Element {
           uploadStatus={uploadStatus}
           onUploadClick={onPickFile}
           onNewNote={() => void newNote(targetFolder())}
-          onOpenTrash={() => setTrashOpen(true)}
+          onOpenSettings={() => setSettingsOpen(true)}
           onContextMenu={(x, y, title, items) => setMenu({ x, y, title, items })}
         />
 

@@ -68,7 +68,8 @@ export interface SidebarProps {
   uploadStatus: string | null;
   onUploadClick: () => void;
   onNewNote: () => void;
-  onOpenTrash: () => void;
+  /** The storage readout is the way into the settings it explains. */
+  onOpenSettings: () => void;
   /** The menu the tree asked for, rendered by the page. */
   onContextMenu: (x: number, y: number, title: string, items: TreeMenuItem[]) => void;
 }
@@ -97,7 +98,7 @@ export default function Sidebar({
   uploadStatus,
   onUploadClick,
   onNewNote,
-  onOpenTrash,
+  onOpenSettings,
   onContextMenu,
 }: SidebarProps): JSX.Element {
   const [sortOpen, setSortOpen] = useState(false);
@@ -114,8 +115,12 @@ export default function Sidebar({
       ? 'Newest first'
       : 'Descending';
 
-  const nearQuota =
-    storage.quotaBytes !== null && storage.quotaBytes > 0 && storage.usedBytes / storage.quotaBytes >= 0.8;
+  const quotaBytes = storage.quotaBytes && storage.quotaBytes > 0 ? storage.quotaBytes : null;
+  const share = quotaBytes ? Math.min(1, storage.usedBytes / quotaBytes) : 0;
+  // The meter's own share, never below 2%: a fill of zero pixels reads as "nothing here" rather
+  // than as the small number it is.
+  const meterWidth = Math.max(2, Math.round(share * 100));
+  const nearQuota = share >= 0.8;
 
   const openSortMenu = (event: MouseEvent<HTMLButtonElement>): void => {
     const box = event.currentTarget.getBoundingClientRect();
@@ -253,29 +258,41 @@ export default function Sidebar({
           </button>
         </div>
 
-        <div className={'rail-storage' + (nearQuota ? ' rail-storage--near' : '')}>
+        {/* The readout is a control rather than a caption: it is the way into the settings that
+            say where the number comes from. The trash is not on this line, in the markup or in
+            the stylesheet: it closes the workspace area's own corner, which is what it acts on. */}
+        <button
+          className={'rail-storage' + (nearQuota ? ' rail-storage--near' : '')}
+          type="button"
+          title={
+            'Storage and settings. ' +
+            noteCount + ' note' + (noteCount === 1 ? '' : 's') + ', ' +
+            fileCount + ' file' + (fileCount === 1 ? '' : 's') + ' in ' +
+            workspaces.length + ' workspace' + (workspaces.length === 1 ? '' : 's') + '.'
+          }
+          onClick={onOpenSettings}
+        >
           <span className="rail-storage__icon" aria-hidden="true">
             <Icon name="database" size={13} />
           </span>
           <span className="rail-storage__text">
             <span className="rail-storage__size">{formatBytes(storage.usedBytes)}</span>
             <span className="rail-storage__label">
-              {noteCount} note{noteCount === 1 ? '' : 's'} · {fileCount} file{fileCount === 1 ? '' : 's'}
+              {noteCount} note{noteCount === 1 ? '' : 's'}
             </span>
           </span>
-          {storage.quotaBytes && storage.quotaBytes > 0 ? (
+          {/* A share of quota is a proportion, so it gets a meter and a percentage; without a
+              quota the percentage would be a made-up number, so the file count is printed. */}
+          {quotaBytes ? (
             <span className="rail-storage__meter" title="Share of the space the browser allows this site">
-              <span
-                className="rail-storage__fill"
-                style={{ width: Math.max(2, Math.round((storage.usedBytes / storage.quotaBytes) * 100)) + '%' }}
-              />
+              <span className="rail-storage__fill" style={{ width: meterWidth + '%' }} />
             </span>
           ) : null}
-        </div>
-
-        <button className="rail-trash" type="button" onClick={onOpenTrash}>
-          <Icon name="trash" size={14} />
-          <span>Trash</span>
+          <span className={quotaBytes ? 'rail-storage__pct' : 'rail-storage__value'}>
+            {quotaBytes
+              ? meterWidth + '%'
+              : fileCount + ' file' + (fileCount === 1 ? '' : 's')}
+          </span>
         </button>
       </div>
 
