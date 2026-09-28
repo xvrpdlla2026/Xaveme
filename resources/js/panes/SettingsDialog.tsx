@@ -21,6 +21,7 @@ import * as vaultApi from "../api/vault";
 import * as workspaceApi from "../api/workspaces";
 import Icon from "../components/Icon";
 import { PALETTES, usePreferences } from "../context/PreferencesContext";
+import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import {
   cancelSetup,
@@ -200,6 +201,10 @@ function VaultPrompt({
 }
 
 export function SettingsDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  // The account half of this dialog: who is signed in, and the way out. Signing out is the
+  // server destroying the session cookie; the shell notices the missing user and returns to
+  // the form, so nothing here has to navigate.
+  const { user, signOut } = useAuth();
   const { toast } = useToast();
   const { theme, palette, saving, setTheme, setPalette } = usePreferences();
   const ref = useRef<HTMLDialogElement | null>(null);
@@ -516,6 +521,19 @@ export function SettingsDialog({ open, onClose }: { open: boolean; onClose: () =
         </header>
 
         <div className="dialog__body">
+          <section className="dialog__section">
+            <h3>Account</h3>
+            <p className="dialog__note">
+              Signed in as <strong>{user ? user.email : "an account that could not be read"}</strong>.
+              Every workspace, folder, note, file and task in this notebook belongs to this
+              account alone.
+            </p>
+            <button className="btn" type="button" onClick={() => void signOut()}>
+              <Icon name="arrowLeft" size={14} />
+              Sign out
+            </button>
+          </section>
+
           <section className="dialog__section">
             <h3>Appearance</h3>
             <div className="segmented" role="radiogroup" aria-label="Theme">
