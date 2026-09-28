@@ -103,6 +103,7 @@ class Folder extends Model
             // Soft deleted children still belong to the subtree, so the walk has
             // to see through the default scope.
             $children = static::withTrashed()
+                ->where('workspace_id', $this->workspace_id)
                 ->whereIn('parent_id', $frontier)
                 ->pluck('id')
                 ->all();
