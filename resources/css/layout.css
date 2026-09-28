@@ -101,7 +101,10 @@
 .topbar__search input::placeholder { color: var(--text-faint); }
 .topbar__search input::-webkit-search-cancel-button { -webkit-appearance: none; }
 
-.topbar__actions { margin-left: auto; display: flex; gap: 4px; }
+/* The view toggle and the two icon controls are different kinds of thing: a choice among views,
+   then an action on the app. At a flat 4px the four controls read as one run of four, so the
+   group break is what carries the difference. */
+.topbar__actions { margin-left: auto; display: flex; gap: 6px; }
 
 /* --------------------------------------------------------------- layout */
 .layout {

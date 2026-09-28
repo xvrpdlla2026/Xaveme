@@ -945,6 +945,9 @@ svg.tree__glyph--note { font-size: 14.5px; }
   transition: background var(--fast), color var(--fast);
 }
 .dialog__close:hover { background: var(--bg-hover); color: var(--text); }
+/* The button sits in the dialog's top corner, and the panel clips its overflow: an outline
+   drawn outside it is cut off by that corner. Drawn inside, it is the same ring undamaged. */
+.dialog__close:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
 
 .dialog__body { padding: 14px 0 2px; }
 .dialog__body > * + * { margin-top: 13px; }
@@ -959,8 +962,11 @@ svg.tree__glyph--note { font-size: 14.5px; }
 .dialog__message strong { color: var(--text); font-weight: 620; }
 
 /* The concrete consequences, listed rather than buried in a sentence. */
+/* The body already spaces its children with "> * + *", but this rule comes later in the sheet
+   and its own reset would win, leaving the box flush against the sentence above it. The gap is
+   written here so the box is a block of its own rather than an underline to the message. */
 .dialog__consequences {
-  margin: 0;
+  margin: 13px 0 0;
   padding: 12px 14px;
   list-style: none;
   border: 1px solid var(--border);
@@ -2094,7 +2100,8 @@ svg.tree__glyph--note { font-size: 14.5px; }
    among the rail's rows, which are what the notebook holds. It is the one control up there
    that is not a bare icon: the number of open tasks is the reason to look at it, so it wears
    a short label and a count and reads as a button in its own right. */
-.topbar__views { display: flex; align-items: center; }
+/* A little air after the pair, so the switches and the icons do not sit in one run. */
+.topbar__views { display: flex; align-items: center; margin-right: 2px; }
 
 .view-btn {
   display: inline-flex;
