@@ -60,6 +60,8 @@ export interface EditorProps {
   onDelete: () => void;
   /** Ask for the passphrase, from the lock notice. */
   onUnlock: () => void;
+  /** Read the vault row again. This is the lock notice's answer to an unreadable vault. */
+  onRetry: () => void;
 }
 
 export default function Editor({
@@ -69,6 +71,7 @@ export default function Editor({
   onSave,
   onDelete,
   onUnlock,
+  onRetry,
 }: EditorProps): JSX.Element {
   // note.content is plaintext by construction: the page opens a sealed body with the vault
   // key before it mounts this component, so an envelope never reaches these fields and a save
@@ -226,7 +229,11 @@ export default function Editor({
                 : 'The note body is stored as sealed text. Unlock the vault to read and edit it.'}
             </p>
           </div>
-          <button className="btn btn--primary" type="button" onClick={onUnlock}>
+          <button
+            className="btn btn--primary"
+            type="button"
+            onClick={unreadable ? onRetry : onUnlock}
+          >
             {unreadable ? 'Try again' : 'Unlock'}
           </button>
         </div>

@@ -17,6 +17,7 @@ import type { DragEvent, JSX } from "react";
 import * as attachmentApi from "../api/attachments";
 import * as folderApi from "../api/folders";
 import * as noteApi from "../api/notes";
+import * as vaultApi from "../api/vault";
 import { request } from "../api/client";
 import {
   isEnvelope,
@@ -50,7 +51,7 @@ import { Dropzone } from "../panes/Dropzone";
 import { SettingsDialog } from "../panes/SettingsDialog";
 import { TaskPane } from "../panes/TaskPane";
 import { TrashPanel } from "../panes/TrashPanel";
-import { VaultGate } from "../panes/VaultGate";
+import { VAULT_CHANGED_EVENT, VaultGate } from "../panes/VaultGate";
 import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 
@@ -316,6 +317,38 @@ export default function Workspace(): JSX.Element {
     return () => {
       cancelled = true;
     };
+  }, [report]);
+
+  // The vault is module state, and every pane that moves it announces the move. This page keeps
+  // its own copy of the status for the editor and the empty state, so it has to listen: a lock,
+  // an unlock, a vault created or removed in Settings all have to reach what is on screen, and
+  // a read that moved the state from unknown to off fires neither of the gate's own callbacks.
+  useEffect(() => {
+    const sync = (): void => setVault(vaultStatus());
+    window.addEventListener(VAULT_CHANGED_EVENT, sync);
+    return () => window.removeEventListener(VAULT_CHANGED_EVENT, sync);
+  }, []);
+
+  /**
+   * Read the vault row again, which is the way out of the unknown state.
+   *
+   * Unknown is a read that failed, not an absent vault, so opening a passphrase prompt cannot
+   * help: there is no row to unlock. The answer is recorded in the crypto module, copied here
+   * and announced, so every pane adopts it and the writes that were refused can go through.
+   */
+  const rereadVault = useCallback((): void => {
+    vaultApi
+      .get()
+      .then((row) => {
+        setVaultRow(row);
+        setVault(vaultStatus());
+        window.dispatchEvent(new Event(VAULT_CHANGED_EVENT));
+      })
+      .catch((error: unknown) => {
+        markVaultUnknown();
+        setVault(vaultStatus());
+        report(error, "The vault could not be read, so nothing will be written until it can be.");
+      });
   }, [report]);
 
   // The storage meter needs the browser's own quota, which is the one number the server
@@ -1234,6 +1267,7 @@ export default function Workspace(): JSX.Element {
               onSave={onSave}
               onDelete={() => deleteNote(editorNote.id)}
               onUnlock={() => window.dispatchEvent(new Event("notebook:unlock-vault"))}
+              onRetry={rereadVault}
             />
           ) : activeNote ? (
             <div className="pane-head">
