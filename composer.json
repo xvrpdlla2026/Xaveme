@@ -1,8 +1,8 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "laravel/laravel",
+    "name": "xvrpdlla2026/xave",
     "type": "project",
-    "description": "The skeleton application for the Laravel framework.",
+    "description": "A self-hosted notes app: workspaces, folders, notes, attachments, tasks and a browser-side vault.",
     "keywords": ["laravel", "framework"],
     "license": "MIT",
     "require": {

@@ -1,14 +1,34 @@
 # Xave
 
-A notes app for people who keep everything in one place: workspaces, nested folders, notes,
-file attachments, a task list, and a vault for the notes you do not want readable at rest.
+[![Tests](https://github.com/xvrpdlla2026/Xaveme/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/xvrpdlla2026/Xaveme/actions/workflows/tests.yml)
 
-The current release is 1.0.0: see [CHANGELOG.md](CHANGELOG.md).
+A notes app you host yourself: workspaces, nested folders, notes, file attachments, a task list,
+and a vault that seals note bodies in the browser before they are ever sent.
 
-The current release is 1.0.0: see [CHANGELOG.md](CHANGELOG.md).
+![The workspace in dark mode](docs/screenshots/workspace-dark.png)
 
-Laravel serves a JSON API and the React single page app from the same origin, so sessions work
-with cookies and there is no separate auth dance.
+## What it does
+
+- **Accounts, kept apart.** Every workspace, folder, note, file and task belongs to one account,
+  and a cross-account isolation test in the suite holds that line.
+- **Workspaces.** Separate notebooks switched from the rail, each with its own tree, task list,
+  trash and storage readout.
+- **Folders and notes.** Nested to any depth, moved by drag or by menu, ordered by hand or by
+  name and date. Notes autosave, and a folder lists its contents as cards.
+- **Files.** Attached to a folder or a note, allowlisted by extension and MIME, written to the
+  private disk, and streamed back through an authorized route, so a stored file never has an open
+  URL.
+- **Tasks.** A per-workspace list with priority, due dates and a done state.
+- **Search.** One search across every workspace you own, from the header, with each hit naming the
+  workspace it came from.
+- **The vault.** Note bodies sealed in the browser with AES-GCM under a passphrase the server
+  never sees. See below for exactly what that does and does not protect.
+- **Appearance.** Light and dark, six palettes, and one token layer under the rail, the tree, the
+  pane and the preview.
+
+![Search across every workspace](docs/screenshots/search.png)
+
+![Sign in](docs/screenshots/sign-in.png)
 
 ## Stack
 
@@ -41,9 +61,9 @@ npm run dev
 Open http://127.0.0.1:8000 and create an account. For a production build, `npm run build`
 writes the compiled assets to `public/build` and `php artisan serve` picks them up.
 
-`php artisan serve` answers one request at a time, so a screen that loads several
-resources at once queues them and looks slow. Set `PHP_CLI_SERVER_WORKERS=4` in `.env`
-before serving to give the dev server a few workers.
+`php artisan serve` answers one request at a time, so a screen that loads several resources at
+once queues them and looks slow. Set `PHP_CLI_SERVER_WORKERS=4` in `.env` before serving to
+give the dev server a few workers.
 
 To point the app at MySQL instead, set `DB_CONNECTION=mysql` and the `DB_*` values in `.env`
 and run `php artisan migrate` again. Nothing in the application code is SQLite specific.
@@ -55,7 +75,8 @@ php artisan test
 ```
 
 The suite covers every endpoint group, the soft delete and purge paths, and a cross user
-isolation test that proves one account can never read or write another account's rows.
+isolation test that proves one account can never read or write another account's rows. The same
+suite runs in CI on every push to `main` and every pull request.
 
 ## Layout
 
@@ -65,8 +86,8 @@ isolation test that proves one account can never read or write another account's
 | `app/Http/Requests` | validation for every write |
 | `app/Policies` | ownership rules, checked on every action |
 | `resources/js/api` | typed client, one module per resource |
-| `resources/js/components` | the shell, the tree and the editor |
-| `resources/js/panes` | tasks, trash, attachments, settings and the vault gate |
+| `resources/js/components` | the shell, the tree, the folder view and the editor |
+| `resources/js/panes` | tasks, trash, settings and the vault gate |
 | `resources/css` | design tokens, then the component layers |
 | `docs/api.md` | the endpoint contract the frontend is written against |
 
@@ -78,15 +99,22 @@ before it is ever sent. The server stores the envelope, the salt, the iteration 
 sealed known string it can neither read nor forge. Losing the passphrase means losing those
 notes, by design.
 
-Attachment bytes are a known exception: they are uploaded and stored as they are, and the
-vault does not cover them. The upload path says so in the record it writes rather than
-labelling them sealed.
+Attachment bytes are a known exception: they are uploaded and stored as they are, and the vault
+does not cover them. The upload path says so in the record it writes rather than labelling them
+sealed.
+
+Because the server only ever holds ciphertext, a search while the vault is on matches titles and
+file names, not note bodies, and the results say so.
 
 ## Attachments
 
 Uploads are validated against both an extension and a MIME allowlist and capped in size, then
 written to the private disk. They are streamed back through an authorized route, so a file is
 never readable without a session that owns it.
+
+## Changelog
+
+What each release holds: [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 
