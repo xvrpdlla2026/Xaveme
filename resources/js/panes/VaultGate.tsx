@@ -103,7 +103,7 @@ export function VaultGate({ children, onConfigured, onUnlocked }: { children: Re
       await unlockVault(row, value);
       apply(vaultStatus());
       setPassphrase("");
-      toast("Notebook unlocked. It stays unlocked until you lock it or close the tab.", "success");
+      toast("Xave unlocked. It stays unlocked until you lock it or close the tab.", "success");
       window.dispatchEvent(new Event(VAULT_CHANGED_EVENT));
     } catch (thrown) {
       setError(thrown instanceof Error ? thrown.message : "That passphrase was refused.");

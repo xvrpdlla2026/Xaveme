@@ -1,7 +1,9 @@
-# Notebook
+# Xave
 
 A notes app for people who keep everything in one place: workspaces, nested folders, notes,
 file attachments, a task list, and a vault for the notes you do not want readable at rest.
+
+The current release is 1.0.0: see [CHANGELOG.md](CHANGELOG.md).
 
 Laravel serves a JSON API and the React single page app from the same origin, so sessions work
 with cookies and there is no separate auth dance.

@@ -51,7 +51,7 @@ export default function Register(): JSX.Element {
         password,
         password_confirmation: confirm,
       });
-      toast('Welcome to Notebook.', 'success');
+      toast('Welcome to Xave.', 'success');
       navigate('/', { replace: true });
     } catch (thrown) {
       if (thrown instanceof ApiError) {
@@ -75,9 +75,9 @@ export default function Register(): JSX.Element {
       <main className="auth__card">
         <div className="auth__brand">
           <span className="topbar__logo" aria-hidden="true">
-            NB
+            X
           </span>
-          <span className="topbar__name">Notebook</span>
+          <span className="topbar__name">Xave</span>
         </div>
         <h1 className="auth__title">Create an account</h1>
         <p className="auth__sub">Notes, folders and tasks in one workspace.</p>

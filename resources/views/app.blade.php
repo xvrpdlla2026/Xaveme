@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="csrf-token" content="{{ csrf_token() }}">
-<title>Notebook</title>
+<title>Xave</title>
 <meta name="description" content="Notes, folders and tasks in one workspace.">
 <script>
   try {

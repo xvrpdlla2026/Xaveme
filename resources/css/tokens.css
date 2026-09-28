@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Notebook: design tokens
+   Xave: design tokens
 
    Every colour, radius and shadow in the app is a custom property declared in
    this file, so the dark variant and the six palettes only redefine variables.

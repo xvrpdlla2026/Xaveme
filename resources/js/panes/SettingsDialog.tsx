@@ -341,7 +341,7 @@ export function SettingsDialog({ open, onClose }: { open: boolean; onClose: () =
     lock();
     setState(vaultStatus());
     announce();
-    toast("Notebook locked. Note bodies and files stay unreadable until you unlock again.", "info", 7000);
+    toast("Xave locked. Note bodies and files stay unreadable until you unlock again.", "info", 7000);
   };
 
   /**
@@ -392,7 +392,7 @@ export function SettingsDialog({ open, onClose }: { open: boolean; onClose: () =
     setState(vaultStatus());
     setPrompt(null);
     announce();
-    toast("Notebook unlocked. It stays unlocked in this tab until you lock it or close the tab.", "success");
+    toast("Xave unlocked. It stays unlocked in this tab until you lock it or close the tab.", "success");
   };
 
   /**

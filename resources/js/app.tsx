@@ -18,7 +18,7 @@ function Booting(): JSX.Element {
   return (
     <div className="empty-state empty-state--big">
       <span className="empty-state__mark" aria-hidden="true">
-        NB
+        X
       </span>
       <p>Opening your notebook...</p>
     </div>
@@ -41,7 +41,7 @@ function RequireAuth({ children }: { children: JSX.Element }): JSX.Element {
       return (
         <div className="empty-state empty-state--big">
           <span className="empty-state__mark" aria-hidden="true">
-            NB
+            X
           </span>
           <p className="empty-state__body" role="alert">
             {bootError}

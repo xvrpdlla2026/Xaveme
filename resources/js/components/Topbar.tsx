@@ -58,7 +58,7 @@ export default function Topbar({
   useEffect(() => {
     const host = brandRef.current;
     if (host && !host.firstChild) {
-      host.textContent = 'NB';
+      host.textContent = 'X';
     }
   }, []);
 
@@ -76,7 +76,7 @@ export default function Topbar({
 
       <div className="topbar__brand">
         <span className="topbar__logo" ref={brandRef} aria-hidden="true" />
-        <span className="topbar__name">Notebook</span>
+        <span className="topbar__name">Xave</span>
       </div>
 
       <div className="topbar__search">

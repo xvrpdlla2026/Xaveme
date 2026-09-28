@@ -88,9 +88,9 @@ export default function Login(): JSX.Element {
       <aside className="auth__aside">
         <div className="auth__brand">
           <span className="topbar__logo" aria-hidden="true">
-            NB
+            X
           </span>
-          <span className="topbar__name">Notebook</span>
+          <span className="topbar__name">Xave</span>
         </div>
 
         <div>

@@ -167,7 +167,7 @@ export default function Sidebar({
   const fileCount = storage.stats?.attachments ?? attachments.length;
 
   return (
-    <aside className="sidebar" aria-label="Notebook navigation">
+    <aside className="sidebar" aria-label="Xave navigation">
       <div className="sidebar__head">
         <div className="workspace-row">
           <div className="workspace-select-host">
