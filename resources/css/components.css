@@ -2100,8 +2100,10 @@ svg.tree__glyph--note { font-size: 14.5px; }
    among the rail's rows, which are what the notebook holds. It is the one control up there
    that is not a bare icon: the number of open tasks is the reason to look at it, so it wears
    a short label and a count and reads as a button in its own right. */
-/* A little air after the pair, so the switches and the icons do not sit in one run. */
-.topbar__views { display: flex; align-items: center; margin-right: 2px; }
+/* Air after the pair, and more of it than the gap between the two icons: the switches are a
+   choice among views and the icons are actions on the app, so the group break is what keeps
+   two hovered targets from reading as one wide control. */
+.topbar__views { display: flex; align-items: center; margin-right: 4px; }
 
 .view-btn {
   display: inline-flex;

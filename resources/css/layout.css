@@ -104,7 +104,7 @@
 /* The view toggle and the two icon controls are different kinds of thing: a choice among views,
    then an action on the app. At a flat 4px the four controls read as one run of four, so the
    group break is what carries the difference. */
-.topbar__actions { margin-left: auto; display: flex; gap: 6px; }
+.topbar__actions { margin-left: auto; display: flex; gap: 8px; }
 
 /* --------------------------------------------------------------- layout */
 .layout {
@@ -463,7 +463,10 @@ body.is-dragging .dropzone { display: flex; }
 /* The settings panel is the one wide dialog; every prompt uses the 480px form. */
 .dialog--wide { width: min(560px, calc(100vw - 32px)); }
 
-.dialog__form { display: flex; flex-direction: column; padding: 20px 22px 20px; }
+/* The panel's own inset. Even on all four sides: the head does not add to the top and the
+   footer does not add to the bottom, so the corner-to-content distance is the same wherever
+   the eye lands, and the ring on the close button has the room it needs inside the corner. */
+.dialog__form { display: flex; flex-direction: column; padding: 24px 24px 22px; }
 
 /* A modal <dialog> that is not open must not paint. The UA stylesheet does this itself,
    but only through a rule with no author counterpart - so an author `display` on .dialog
