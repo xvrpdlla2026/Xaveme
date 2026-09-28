@@ -465,8 +465,10 @@ body.is-dragging .dropzone { display: flex; }
 
 /* The panel's own inset. Even on all four sides: the head does not add to the top and the
    footer does not add to the bottom, so the corner-to-content distance is the same wherever
-   the eye lands, and the ring on the close button has the room it needs inside the corner. */
-.dialog__form { display: flex; flex-direction: column; padding: 24px 24px 22px; }
+   the eye lands, and the ring on the close button has the room it needs inside the corner.
+   Forced, because the fullscreen trash panel's own rule for this element is more specific than
+   this one is, and it was the rule winning on every dialog. The panel keeps its own zero. */
+.dialog__form { display: flex; flex-direction: column; padding: 24px 24px 22px !important; }
 
 /* A modal <dialog> that is not open must not paint. The UA stylesheet does this itself,
    but only through a rule with no author counterpart - so an author `display` on .dialog
