@@ -130,14 +130,25 @@
 
 .workspace-row { display: flex; gap: 6px; align-items: center; }
 
-/* The switcher widget fills the row; the select inside it is the same shape. */
+/* The switcher widget fills the row; the select inside it is the same shape. Flex, not
+   block: the rail's select is a row of its own parts (glyph, value, chevron), and with block
+   those parts stack as inline text and the control measures ~23px in a 34px trigger's place. */
 .workspace-select-host { flex: 1 1 auto; min-width: 0; }
-.workspace-select-host .select { display: block; }
+.workspace-select-host .select { display: flex; align-items: center; min-width: 0; }
 
 .workspace-tools { display: flex; align-items: center; gap: 4px; margin-top: 4px; }
 .dot { color: var(--text-faint); font-size: 11px; }
 
 /* Tree region. The label sits outside #tree so it never scrolls with the rows. */
+/* The section is the nav that owns the tree, so the base rule is the flex column
+   itself: without it the nav is a plain block and the tree below it cannot be the
+   part that scrolls. The --grow modifier is what makes this one fill the rail. */
+.sidebar__section {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
 .sidebar__section--grow {
   flex: 1 1 auto;
   min-height: 0;
@@ -194,6 +205,32 @@
 .sidebar__sort:hover { background: var(--bg-hover); color: var(--text); }
 .sidebar__sort[aria-expanded="true"] { background: var(--bg-hover); color: var(--text); }
 .sidebar__sort.is-manual { color: var(--accent); }
+
+/* The rail's own way into the trash, on the footer floor under the action pair.
+   It is a `.btn--rail` in everything but name: same 30px height, same transparent
+   border, same muted ink that answers the pointer. Written out rather than added
+   to the markup because the port's rule set is the contract here. */
+.rail-trash {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  height: 30px;
+  padding: 0 9px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 550;
+  cursor: pointer;
+  transition: background var(--fast), color var(--fast);
+}
+.rail-trash .icon { font-size: 13.5px; opacity: 0.9; }
+.rail-trash:hover { background: var(--bg-hover); color: var(--text); }
+.rail-trash:active { transform: translateY(1px); }
+.rail-trash:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* -------------------------------------------------- workspace trash control */
 /* The trash: a round control that closes the workspace area's bottom-right corner -

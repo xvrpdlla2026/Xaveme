@@ -360,6 +360,12 @@ svg.tree__glyph--note { font-size: 14.5px; }
 }
 .tree__twisty:hover { color: var(--text); background: var(--border); }
 
+/* A note row and a file row carry no disclosure control, so their leading glyph states what
+   they are: a note's icon is the mark the editor uses for the same object, and a file keeps
+   the type pill. The glyph only states its colour; the grid is .tree__row's. */
+.tree__row--note .tree__glyph { color: var(--text-faint); }
+.tree__row--file .tree__when { font-variant-numeric: tabular-nums; }
+
 .tree__glyph-chevron {
   width: 6px;
   height: 10px;
@@ -606,6 +612,18 @@ svg.tree__glyph--note { font-size: 14.5px; }
 }
 .card--folder .card__glyph { color: var(--accent); }
 
+/* A file card: a page about a stored file, so its leading mark is the same type pill the
+   tree and the trash use. Typography only - the box, the radius and the shelf are .card's. */
+.card--file .card__glyph {
+  align-self: flex-start;
+  padding: 1px 5px;
+  border-radius: var(--radius-xs);
+  background: var(--bg-sunken);
+  font-size: 8.5px;
+  letter-spacing: 0.03em;
+}
+.card--file:hover .card__glyph { background: var(--bg-active); color: var(--accent); }
+
 .card__title {
   font-size: 13px;
   font-weight: 600;
@@ -680,6 +698,22 @@ svg.tree__glyph--note { font-size: 14.5px; }
      height it has, so a growing textarea would only push the footer off the bottom. */
   overflow-y: auto;
 }
+/* The heading block is the elastic part of the head: it takes the width the glyph and the
+   stamp leave, and a long title wraps inside that, so the stamp never has to give up its own
+   line to a growing title. */
+.pane-head__text { flex: 1 1 auto; min-width: 0; }
+
+/* The save stamp. It is one short fact at the trailing edge of the head, so it keeps its own
+   width and prints on one line: wrapped, "Saved 02:28:57 PM" became three lines of a column
+   barely wider than the word. */
+.pane-head__stamp {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 6px;
+  white-space: nowrap;
+}
+
 .editor__body:focus { outline: none; }
 .editor__body::placeholder { color: var(--text-faint); }
 
@@ -822,6 +856,15 @@ svg.tree__glyph--note { font-size: 14.5px; }
   letter-spacing: -0.01em;
 }
 .empty-state p { font-size: 13px; max-width: 44ch; margin: 0 auto; }
+
+/* The body copy of an empty state: the sentence under the heading, on its own measure so
+   it wraps as prose rather than as one long line across the card. */
+.empty-state__body {
+  margin: 6px auto 0;
+  max-width: 46ch;
+  font-size: 13px;
+  line-height: 1.6;
+}
 
 .empty-state--big {
   max-width: 520px;
@@ -1112,6 +1155,9 @@ svg.tree__glyph--note { font-size: 14.5px; }
   letter-spacing: -0.014em;
 }
 .lock-notice p { font-size: 13px; line-height: 1.6; max-width: 46ch; }
+/* The notice's text block: the mark, the sentence and the action are the column's own gap
+   already, so this only bounds the prose so it wraps inside the card. */
+.lock-notice__text { max-width: 46ch; }
 .lock-notice .btn { margin-top: 8px; }
 /* Damage is not the same message as locked, so it does not get the same tile: the accent
    mark says "there is a way in", and here there is not. */
@@ -1256,6 +1302,15 @@ svg.tree__glyph--note { font-size: 14.5px; }
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-ring);
 }
+/* The rail form lays its own parts out: in the component's shape the lead glyph, the value
+   and the chevron are the flex row, and in the rail's current shape (lead, hidden native,
+   chevron, no value element) the same three declarations still keep the glyph and the arrow
+   on one line instead of letting them stack as inline text. A hidden child is out of flow
+   either way, so this is safe for both. */
+.select--rail { display: flex; align-items: center; gap: 4px; }
+.select--rail .select__native { flex: 0 0 auto; }
+.select--rail .select__trigger { flex: 1 1 auto; }
+
 .select__lead { flex: 0 0 auto; color: var(--text-faint); font-size: 15px; }
 
 /* ---------------------------------------------------------------- toasts */
@@ -1302,6 +1357,33 @@ svg.tree__glyph--note { font-size: 14.5px; }
   text-align: center;
   animation: toast-in var(--slow);
 }
+/* A notification's kind is carried by its word as well as its tone, and the leading mark is
+   the same 5px dot the editor's save state uses: one shape for "a state of the app" across
+   the surfaces, so a failed upload does not read like a saved note. */
+.toast--info,
+.toast--success,
+.toast--warn,
+.toast--error {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding-left: 11px;
+}
+.toast--info::before,
+.toast--success::before,
+.toast--warn::before,
+.toast--error::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: currentColor;
+}
+.toast--success { color: var(--success); }
+.toast--warn { color: var(--warning); }
+.toast--error { color: var(--danger); }
+
 .toast--out { opacity: 0; transform: translateY(-4px); transition: opacity 160ms var(--ease), transform 160ms var(--ease); }
 
 .toast__msg { display: block; }
@@ -2210,6 +2292,15 @@ svg.tree__glyph--note { font-size: 14.5px; }
 @media (hover: none) {
   .task-row__actions { opacity: 1; }
 }
+/* The row's per-task controls sit in the trailing column and are revealed with the actions
+   group. They are the app's icon buttons in a row: the tone is quieter at rest to match the
+   row's metadata, it lifts with the row, and the destructive control keeps its own colour
+   the whole time. The row-level rules use :where(), which adds no specificity, so the two
+   classes that are actually about the control always win over "this row is hovered". */
+.task-row__action { color: var(--text-faint); }
+.task-row:where(:hover, :focus-within) .task-row__action { color: var(--text-muted); }
+.task-row__action:not(.task-row__action--danger):hover { background: var(--bg-hover); color: var(--text); }
+.task-row__action--danger { color: var(--danger); }
 .task-row__action--danger:hover { background: var(--danger-soft); color: var(--danger); }
 
 /* The edit dialog's form: two columns for the four short facts, one column for the text,
