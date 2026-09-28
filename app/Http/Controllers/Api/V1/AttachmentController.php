@@ -19,6 +19,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Symfony\Component\HttpFoundation\HeaderUtils;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AttachmentController extends Controller
@@ -108,8 +109,9 @@ class AttachmentController extends Controller
 
         abort_unless(Storage::disk('local')->exists($attachment->path), 404);
 
-        return Storage::disk('local')->download($attachment->path, $attachment->filename, [
+        return Storage::disk('local')->download($attachment->path, $this->safeFilename($attachment->filename), [
             'Content-Type' => $attachment->mime_type,
+            'X-Content-Type-Options' => 'nosniff',
         ]);
     }
 
@@ -120,9 +122,16 @@ class AttachmentController extends Controller
         abort_unless($attachment->isPreviewable(), 404);
         abort_unless(Storage::disk('local')->exists($attachment->path), 404);
 
-        return Storage::disk('local')->response($attachment->path, $attachment->filename, [
+        $filename = $this->safeFilename($attachment->filename);
+
+        return Storage::disk('local')->response($attachment->path, $filename, [
             'Content-Type' => $attachment->mime_type,
-            'Content-Disposition' => 'inline; filename="'.addslashes($attachment->filename).'"',
+            'Content-Disposition' => HeaderUtils::makeDisposition(
+                HeaderUtils::DISPOSITION_INLINE,
+                $filename,
+                $this->asciiFallbackName($attachment->filename),
+            ),
+            'X-Content-Type-Options' => 'nosniff',
         ]);
     }
 
@@ -233,5 +242,30 @@ class AttachmentController extends Controller
         return AttachmentResource::collection(
             Attachment::query()->whereIn('id', $ids)->orderBy('position')->get()
         )->response();
+    }
+
+    /**
+     * A name that is safe to place in a header. The stored filename allows any
+     * string up to 255 characters, and Symfony's makeDisposition rejects
+     * control characters and path separators, so neither may reach it.
+     */
+    private function safeFilename(string $filename): string
+    {
+        $name = str_replace(['/', '\\'], '_', $filename);
+        $name = (string) preg_replace('/[\x00-\x1f\x7f]/', '', $name);
+
+        return $name === '' ? 'attachment' : $name;
+    }
+
+    /**
+     * The plain ASCII fallback for clients that ignore RFC 5987 encoding.
+     */
+    private function asciiFallbackName(string $filename): string
+    {
+        $name = str_replace('%', '', Str::ascii($this->safeFilename($filename)));
+        $name = (string) preg_replace('/[^\x20-\x7e]/', '', $name);
+        $name = trim(str_replace(['/', '\\'], '_', $name));
+
+        return $name === '' ? 'attachment' : $name;
     }
 }

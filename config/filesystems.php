@@ -33,7 +33,9 @@ return [
         'local' => [
             'driver' => 'local',
             'root' => storage_path('app/private'),
-            'serve' => true,
+            // Serving this disk would register unauthenticated GET and PUT
+            // routes at /storage/{path} for a private disk.
+            'serve' => false,
             'throw' => false,
             'report' => false,
         ],
