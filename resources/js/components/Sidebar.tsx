@@ -160,6 +160,11 @@ export default function Sidebar({
   const noteCount = storage.noteCount || storage.stats?.notes || notes.length;
   const fileCount = storage.stats?.attachments ?? attachments.length;
 
+  // The native select is kept for the platform picker, but it is one pixel wide to the eye, so
+  // the name of the open workspace has to be written next to it or nothing on screen says which
+  // notebook you are looking at.
+  const activeWorkspace = workspaces.find((workspace) => workspace.id === workspaceId) ?? null;
+
   return (
     <aside className="sidebar" aria-label="Notebook navigation">
       <div className="sidebar__head">
@@ -182,6 +187,9 @@ export default function Sidebar({
                   </option>
                 ))}
               </select>
+              <span className="select__value">
+                {activeWorkspace ? activeWorkspace.name : 'No workspace yet'}
+              </span>
               <span className="select__chevron" aria-hidden="true">
                 <Icon name="chevron" size={14} />
               </span>
