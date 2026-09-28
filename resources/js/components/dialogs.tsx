@@ -23,6 +23,8 @@ interface ShellProps {
   icon?: IconName;
   danger?: boolean;
   onCancel: () => void;
+  /** What the form's own submit means here: the primary button, and Enter from any field. */
+  onSubmit?: () => void;
   children: ReactNode;
   footer: ReactNode;
   labelledBy: string;
@@ -37,6 +39,7 @@ function DialogShell({
   onCancel,
   children,
   footer,
+  onSubmit,
   labelledBy,
 }: ShellProps): JSX.Element | null {
   const ref = useRef<HTMLDialogElement | null>(null);
@@ -70,10 +73,14 @@ function DialogShell({
       <form
         className="dialog__form"
         noValidate
-        method="dialog"
         onSubmit={(event) => {
+          // A form submits on Enter from any field and on its primary button, which is the one
+          // control that must never silently do nothing. The default is a navigation, so the
+          // event is always stopped; what it means is up to the dialog. `method="dialog"` used
+          // to sit here, and it is what broke every creation: a dialog-method form skips the
+          // submit event entirely, so the button closed the element and told React nothing.
           event.preventDefault();
-          onCancel();
+          if (onSubmit) onSubmit();
         }}
       >
         <div className="dialog__head">
@@ -158,6 +165,7 @@ export function ConfirmDialog({
       {...(icon ? { icon } : {})}
       {...(danger ? { danger: true } : {})}
       onCancel={onCancel}
+      onSubmit={submit}
       labelledBy="dlg-confirm-title"
       footer={
         <>
@@ -270,6 +278,7 @@ export function PromptDialog({
       title={title}
       {...(icon ? { icon } : {})}
       onCancel={onCancel}
+      onSubmit={() => submit()}
       labelledBy="dlg-prompt-title"
       footer={
         <>
