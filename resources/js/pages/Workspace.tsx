@@ -783,6 +783,9 @@ export default function Workspace(): JSX.Element {
       }
       if (done) {
         setUploadStatus(done + " file" + (done === 1 ? "" : "s") + " uploaded.");
+        // A file that landed in a folder the tree is not showing would be uploaded successfully
+        // and then be nowhere on screen, so the folder it went into opens with it.
+        if (folderId) setExpanded((current) => ({ ...current, [folderId]: true }));
         refresh();
         window.setTimeout(() => setUploadStatus(null), 4000);
       } else {
