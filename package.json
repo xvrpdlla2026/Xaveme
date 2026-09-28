@@ -1,5 +1,8 @@
 {
     "$schema": "https://www.schemastore.org/package.json",
+    "name": "xave",
+    "version": "1.0.0",
+    "description": "The React single page app for Xave, built with Vite.",
     "private": true,
     "type": "module",
     "scripts": {
