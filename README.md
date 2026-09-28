@@ -34,6 +34,11 @@ test in the suite holds that line.
 |---|---|
 | ![Settings, account section](docs/screenshots/account-settings.png) | ![A second account's own workspaces](docs/screenshots/account-two.png) |
 
+Signing in is the one screen that stands outside the app, so it says what the notebook holds before
+anyone is inside it.
+
+![Sign in](docs/screenshots/sign-in.png)
+
 ## Search
 
 One search across every workspace you own, from the header. Each hit names the workspace it came
