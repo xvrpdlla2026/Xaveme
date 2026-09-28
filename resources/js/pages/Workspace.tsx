@@ -978,15 +978,25 @@ export default function Workspace(): JSX.Element {
   const treeActions: TreeActions = useMemo(
     () => ({
       onSelect: (next) => {
+        // Choosing a container shows that container: it is what lets a crumb walk back up out
+        // of the note or file that is open, and it is the reference's goto-folder contract.
         setSelection(next);
+        setActiveNoteId(null);
+        setActiveAttachment(null);
         setView("notes");
       },
       onToggleFolder: (id) => {
         setExpanded((current) => ({ ...current, [id]: !current[id] }));
       },
       onOpenNote: (id) => {
+        // One thing is open at a time: opening a note lets go of the file, which is what keeps
+        // a single row active in the tree.
         setActiveNoteId(id);
         setActiveAttachment(null);
+        // The selection follows the item into the folder it lives in, so the pane and the tree
+        // still describe the same place once nothing is open any more.
+        const note = notes.find((entry) => entry.id === id);
+        setSelection(note && note.folder_id ? { type: "folder", id: note.folder_id } : { type: "all", id: null });
         setView("notes");
         setMobileList(false);
       },
@@ -994,6 +1004,10 @@ export default function Workspace(): JSX.Element {
         const attachment = attachments.find((entry) => entry.id === id);
         if (!attachment) return;
         setActiveAttachment(attachment);
+        setActiveNoteId(null);
+        setSelection(
+          attachment.folder_id ? { type: "folder", id: attachment.folder_id } : { type: "all", id: null },
+        );
         setView("notes");
         setMobileList(false);
       },
@@ -1061,6 +1075,7 @@ export default function Workspace(): JSX.Element {
       moveFolderTo,
       moveNote,
       newNote,
+      notes,
       renameAttachment,
       renameFolder,
       renameNote,
@@ -1083,10 +1098,11 @@ export default function Workspace(): JSX.Element {
         return;
       }
       if (activeNoteId) setActiveNoteId(null);
+      if (activeAttachment) setActiveAttachment(null);
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [activeNoteId, confirm, menu, prompt, search, settingsOpen, trashOpen]);
+  }, [activeAttachment, activeNoteId, confirm, menu, prompt, search, settingsOpen, trashOpen]);
 
   useEffect(() => {
     const query = window.matchMedia(NARROW_QUERY);
