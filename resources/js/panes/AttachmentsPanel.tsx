@@ -18,7 +18,6 @@ import type { MenuItem } from "../components/dialogs";
 import EmptyState from "../components/EmptyState";
 import Icon from "../components/Icon";
 import { useToast } from "../context/ToastContext";
-import { status as vaultStatus } from "../lib/crypto";
 import { extensionBadge, formatBytes, formatRelative, isPreviewableMime } from "../lib/format";
 import type { Attachment, Folder } from "../types";
 
@@ -79,13 +78,14 @@ export function AttachmentsPanel({ workspaceId, folderId }: { workspaceId: strin
   const upload = async (files: FileList): Promise<void> => {
     const list = Array.from(files);
     if (!list.length || !workspaceId || uploading) return;
-    const sealed = vaultStatus() !== "off";
     setUploading(true);
     let done = 0;
     for (const file of list) {
       setStatus("Uploading " + file.name + (list.length > 1 ? " (" + (done + 1) + " of " + list.length + ")" : ""));
       try {
-        const created = await attachmentApi.upload(workspaceId, { file, folder_id: folderId, encrypted: sealed });
+        // The bytes go up as they are: the vault seals note bodies only, never files, so the flag
+        // says false rather than claiming a seal that does not happen.
+        const created = await attachmentApi.upload(workspaceId, { file, folder_id: folderId, encrypted: false });
         done += 1;
         setRows((current) => [...current, created]);
       } catch (error) {

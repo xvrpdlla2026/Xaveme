@@ -36,12 +36,14 @@ export async function upload(
   const form = new FormData();
   form.append('file', payload.file);
   if (payload.folder_id) form.append('folder_id', payload.folder_id);
+  // Attachment bytes are stored exactly as they are uploaded. The vault seals note bodies and
+  // nothing else, so this flag states what the server holds, not what it might hold one day.
   if (payload.encrypted) form.append('encrypted', '1');
   return request<Attachment>({
     method: 'post',
     path: '/workspaces/' + workspaceId + '/attachments',
-    // The instance default is JSON. Axios has to choose the multipart boundary itself, so
-    // the content type is cleared for this one request rather than set to anything.
+    // Nothing is set here on purpose: the client drops its JSON default for a FormData body, so
+    // the browser sends multipart/form-data with the boundary it chose itself.
     body: form,
     signal: options.signal,
   });

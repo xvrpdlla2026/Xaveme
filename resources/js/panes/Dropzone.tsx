@@ -14,7 +14,6 @@
 
 import { useCallback, useEffect, useRef } from "react";
 import * as attachmentApi from "../api/attachments";
-import { status as vaultStatus } from "../lib/crypto";
 import { useToast } from "../context/ToastContext";
 
 export function Dropzone({ workspaceId, folderId }: { workspaceId: string; folderId: string | null }) {
@@ -41,12 +40,13 @@ export function Dropzone({ workspaceId, folderId }: { workspaceId: string; folde
       const list = Array.from(files);
       if (!id || !list.length || uploading.current) return;
       uploading.current = true;
-      const sealed = vaultStatus() !== "off";
       if (list.length > 1) toast("Uploading " + list.length + " files...", "info");
       let done = 0;
       for (const file of list) {
         try {
-          await attachmentApi.upload(id, { file, folder_id: target.current, encrypted: sealed });
+          // The bytes go up as they are: the vault seals note bodies only, never files, so the
+          // flag says false rather than claiming a seal that does not happen.
+          await attachmentApi.upload(id, { file, folder_id: target.current, encrypted: false });
           done += 1;
         } catch (error) {
           toast(error instanceof Error ? error.message : "The upload of " + file.name + " failed.", "error");

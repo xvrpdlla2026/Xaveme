@@ -10,6 +10,8 @@
  *     carrying a message and the field errors a form needs to render, so no caller ever
  *     reads an axios error object.
  *   - the 401 rule. An unauthenticated response clears the session in exactly one place.
+ *   - the content type. JSON is the default, and a multipart body drops it, so a caller that
+ *     uploads a file does not have to remember to clear a header the instance set for it.
  */
 
 import axios, { AxiosError, AxiosHeaders, type AxiosInstance } from 'axios';
@@ -172,6 +174,13 @@ export const http: AxiosInstance = axios.create({
 http.interceptors.request.use((config) => {
   const headers = AxiosHeaders.from(config.headers);
   headers.set('Accept', JSON_TYPE);
+  // A multipart body must never be announced as JSON. The instance default asserts
+  // application/json, and axios reads that very header when it transforms a FormData body:
+  // under a JSON content type it serialises the form as JSON instead of sending it, so the file
+  // field never reaches the server and the upload is refused. Deleting the header leaves the
+  // choice to the browser, which is the only thing that can set multipart/form-data along with
+  // the boundary it chose.
+  if (config.data instanceof FormData) headers.delete('Content-Type');
   const token = xsrfToken();
   if (token) headers.set('X-XSRF-TOKEN', token);
   config.headers = headers;
