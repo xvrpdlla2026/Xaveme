@@ -1483,9 +1483,9 @@ svg.tree__glyph--note { font-size: 14.5px; }
   padding: var(--panel-inset);
   background: transparent;
 }
-/* The panel draws its own insets, so its form stays flush and says so as loudly as the base
-   rule forces the other dialogs' inset. */
-.dialog--full .dialog__form { flex: 1 1 auto; min-height: 0; padding: 0 !important; }
+/* The panel draws its own insets, and this form adds none of its own: the padding it ends up
+   with is the base rule's, which is the frame between the viewport edge and the panel. */
+.dialog--full .dialog__form { flex: 1 1 auto; min-height: 0; }
 
 /* The surface. One rounded, bounded card, and every band lives inside it - so the
    panel is the only thing on screen with a shape, and a row is never stretched across a
