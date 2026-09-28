@@ -76,6 +76,8 @@ Nested by `parent_id` (null = workspace root). Soft deleted by default, so destr
 
 Search: `q` matches note title and content with LIKE, case insensitive, scoped to the workspace. Attachment name search lives on the attachments index with the same `q`.
 
+`GET /search?q=` searches every workspace the account owns at once, at most 100 notes and 100 files, newest first. Each hit carries `workspace_id` and `workspace_name`, so a caller can say where a result came from and move there to open it. A sealed note body is stored as ciphertext, so it matches on its title only.
+
 ## Attachments
 
 Stored on the private disk, never in `public/`. Bytes are streamed through an authorized route. Uploads are allowlisted by extension and MIME and capped at 20 MB.

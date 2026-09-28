@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\FolderController;
 use App\Http\Controllers\Api\V1\NoteController;
 use App\Http\Controllers\Api\V1\PreferencesController;
+use App\Http\Controllers\Api\V1\SearchController;
 use App\Http\Controllers\Api\V1\TaskController;
 use App\Http\Controllers\Api\V1\TrashController;
 use App\Http\Controllers\Api\V1\VaultController;
@@ -20,6 +21,10 @@ Route::prefix('v1')->group(function (): void {
     Route::middleware('auth:sanctum')->group(function (): void {
         Route::post('logout', [AuthController::class, 'logout']);
         Route::get('me', [AuthController::class, 'me']);
+
+        // One search across every workspace the account owns. It sits beside "me" rather
+        // than under a workspace, because it is deliberately not about one.
+        Route::get('search', [SearchController::class, 'index']);
 
         Route::get('preferences', [PreferencesController::class, 'show']);
         Route::put('preferences', [PreferencesController::class, 'update']);

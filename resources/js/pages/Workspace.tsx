@@ -17,6 +17,7 @@ import type { DragEvent, JSX } from "react";
 import * as attachmentApi from "../api/attachments";
 import * as folderApi from "../api/folders";
 import * as noteApi from "../api/notes";
+import * as searchApi from "../api/search";
 import * as vaultApi from "../api/vault";
 import { request } from "../api/client";
 import {
@@ -45,8 +46,10 @@ import FolderView from "../components/FolderView";
 import Icon from "../components/Icon";
 import Sidebar from "../components/Sidebar";
 import type { ContextItem, Selection, TreeActions } from "../components/Tree";
+import type { SearchFileHit, SearchNoteHit, SearchResponse } from "../api/search";
 import Topbar from "../components/Topbar";
 import type { WorkspaceView } from "../components/Topbar";
+import SearchResults from "../components/SearchResults";
 import { ConfirmDialog, ContextMenu, PromptDialog } from "../components/dialogs";
 import { Dropzone } from "../panes/Dropzone";
 import { SettingsDialog } from "../panes/SettingsDialog";
@@ -139,6 +142,10 @@ export default function Workspace(): JSX.Element {
   const [stats, setStats] = useState<WorkspaceStats | null>(null);
 
   const [search, setSearch] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResponse | null>(null);
+  // A file hit from another workspace arrives before that workspace's own file list does, so the
+  // id waits here until the list it belongs to has loaded and there is an object to open.
+  const [pendingFileId, setPendingFileId] = useState<string | null>(null);
   const [sort, setSort] = useState<Sort>({ key: "manual", direction: "asc" });
   const [view, setView] = useState<WorkspaceView>("notes");
   const [narrow, setNarrow] = useState<boolean>(() => window.matchMedia(NARROW_QUERY).matches);
@@ -259,7 +266,6 @@ export default function Workspace(): JSX.Element {
             {
               sort: sort.key,
               direction: sort.direction,
-              ...(search.trim() ? { q: search.trim() } : {}),
             },
             { signal },
           ),
@@ -291,7 +297,7 @@ export default function Workspace(): JSX.Element {
 
     void load();
     return () => controller.abort();
-  }, [workspaceId, sort.key, sort.direction, search, reloadKey, report]);
+  }, [workspaceId, sort.key, sort.direction, reloadKey, report]);
 
   // The vault row decides whether note bodies are sealed. Without it the editor would seal
   // a body into a notebook that has no key, which is the one thing the format forbids.
@@ -351,6 +357,72 @@ export default function Workspace(): JSX.Element {
         report(error, "The vault could not be read, so nothing will be written until it can be.");
       });
   }, [report]);
+
+  // ----------------------------------------------------------------- search, every workspace
+
+  /**
+   * A search is not scoped to the open workspace.
+   *
+   * The tree is, because that is what a tree is for, but a note kept in another workspace is
+   * exactly the thing a search is for, and a hit the reader cannot open is not an answer. So the
+   * term goes to the search endpoint and the pane draws what comes back, workspace name and all.
+   */
+  useEffect(() => {
+    const term = search.trim();
+    if (!term || view !== "notes") {
+      setSearchResults(null);
+      return;
+    }
+    const controller = new AbortController();
+    setSearchResults(null);
+    searchApi
+      .search(term, { signal: controller.signal })
+      .then((rows) => {
+        if (!controller.signal.aborted) setSearchResults(rows);
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        report(error, "The search could not be run.");
+      });
+    return () => controller.abort();
+  }, [search, view, report]);
+
+  useEffect(() => {
+    if (!pendingFileId) return;
+    const found = attachments.find((entry) => entry.id === pendingFileId);
+    if (!found) return;
+    setActiveAttachment(found);
+    setPendingFileId(null);
+  }, [attachments, pendingFileId]);
+
+  /**
+   * Open a hit, from whatever workspace it came from.
+   *
+   * One from another workspace moves the page there first: the note, its folder and its files are
+   * that workspace's rows, and the tree has to be showing them before there is anything to open.
+   * The term is cleared, because the reader has finished searching and started reading.
+   */
+  const openSearchHit = useCallback(
+    (workspace: string, folderId: string | null, id: string, kind: "note" | "file"): void => {
+      setSearch("");
+      setView("notes");
+      setMobileList(false);
+      if (workspace !== workspaceId) {
+        setWorkspaceId(workspace);
+        setSelection({ type: "all", id: null });
+      } else {
+        setSelection(folderId ? { type: "folder", id: folderId } : { type: "all", id: null });
+      }
+      if (kind === "note") {
+        setActiveNoteId(id);
+        setActiveAttachment(null);
+      } else {
+        setActiveNoteId(null);
+        setPendingFileId(id);
+      }
+    },
+    [workspaceId],
+  );
 
   // The storage meter needs the browser's own quota, which is the one number the server
   // cannot know.
@@ -1272,6 +1344,17 @@ export default function Workspace(): JSX.Element {
         <main id="main" className="main" aria-live="polite">
           {view === "tasks" ? (
             <TaskPane workspaceId={workspaceId ?? ""} />
+          ) : view === "notes" && searching ? (
+            <SearchResults
+              term={search.trim()}
+              response={searchResults}
+              sealed={vault !== "off"}
+              activeNoteId={activeNoteId}
+              activeFileId={openAttachmentId}
+              currentWorkspaceId={workspaceId}
+              onOpenNote={(hit: SearchNoteHit) => openSearchHit(hit.workspace_id, hit.folder_id, hit.id, "note")}
+              onOpenFile={(hit: SearchFileHit) => openSearchHit(hit.workspace_id, hit.folder_id, hit.id, "file")}
+            />
           ) : activeAttachment ? (
             <AttachmentView
               attachment={activeAttachment}
@@ -1324,14 +1407,10 @@ export default function Workspace(): JSX.Element {
                   : "Its body is sealed and the vault could not open it, so nothing is shown and nothing will be written over it."}
               </p>
             </div>
-          ) : searching || loading ? (
+          ) : loading ? (
             <div className="pane-head">
-              <h2 className="pane-head__title">{searching ? "Search results" : "Loading this workspace"}</h2>
-              <p className="pane-head__sub">
-                {searching
-                  ? notes.length + (notes.length === 1 ? " note matches " : " notes match ") + '"' + search.trim() + '"'
-                  : "Folders, notes and files are on their way."}
-              </p>
+              <h2 className="pane-head__title">Loading this workspace</h2>
+              <p className="pane-head__sub">Folders, notes and files are on their way.</p>
             </div>
           ) : (
             <FolderView
