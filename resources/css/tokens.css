@@ -1,0 +1,294 @@
+/* ==========================================================================
+   Notebook: design tokens
+
+   Every colour, radius and shadow in the app is a custom property declared in
+   this file, so the dark variant and the six palettes only redefine variables.
+
+   Three rules keep the sheets coherent:
+     1. Every colour, radius and shadow is a token. No literal colour appears
+        below the token block, so the dark variant only redefines variables.
+     2. One accent (indigo), one neutral family (cool slate), one radius scale
+        (4 / 8 / 12), one shadow tier.
+     3. Zones are separated by hairlines and surface tone, not by boxes: the
+        rail is a shade darker than the canvas, the canvas a shade darker than
+        a raised card.
+   ========================================================================== */
+
+/* ---------------------------------------------------------------- tokens */
+:root {
+  color-scheme: light;
+
+  /* Type: platform UI stack with a real monospace for counts and byte sizes. */
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", "Cascadia Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* Surfaces: rail < canvas < raised, so zone changes read without a border. */
+  --bg: #f4f5f8;          /* rail */
+  --bg-canvas: #fafbfc;   /* main pane */
+  --bg-raised: #ffffff;   /* cards, dialogs */
+  --bg-sunken: #eceef2;   /* inputs, wells, glyph tiles */
+  --bg-hover: #e7eaef;
+  --bg-active: #e6eafd;
+
+  --text: #1a1d23;
+  --text-muted: #5d6470;
+  --text-faint: #878d99;
+  --text-inverse: #ffffff;
+
+  --border: #e0e3e9;
+  --border-strong: #c9cfd8;
+
+  --accent: #3b4ede;
+  --accent-hover: #2f40c4;
+  --accent-soft: #e6eafd;
+  --accent-ring: rgba(59, 78, 222, 0.32);
+  --danger: #bf2a3d;
+  --danger-soft: #fbeaec;
+  --success: #1c7a4d;
+  --warning: #8a5a00;
+
+  --shadow-sm: 0 1px 2px rgba(23, 28, 44, 0.05);
+  --shadow-md: 0 8px 24px -8px rgba(23, 28, 44, 0.18);
+  --shadow-lg: 0 32px 64px -24px rgba(23, 28, 44, 0.32);
+  --shadow-accent: 0 1px 2px rgba(59, 78, 222, 0.24);
+
+  /* One fixed chip per palette so the Settings chooser can name a palette with its own
+     colour. The light accents are used verbatim in both modes: a swatch that followed the
+     live theme would repaint the five unselected chips in the chosen palette's clothes,
+     which is the one thing a chooser must never do - the chips are the label, not a
+     preview of the page. */
+  --palette-indigo-swatch: #3b4ede;
+  --palette-teal-swatch: #0f766e;
+  --palette-amber-swatch: #a15c07;
+  --palette-rose-swatch: #b3325a;
+  --palette-violet-swatch: #6d34c4;
+  --palette-graphite-swatch: #4a5260;
+
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius: 8px;
+  --radius-lg: 12px;
+
+  --sidebar-w: 296px;
+  --topbar-h: 56px;
+
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --fast: 120ms var(--ease);
+  --slow: 260ms var(--ease);
+
+  /* One glyph width and one indent step drive the whole tree geometry; the
+     guide rails below are positioned from these two numbers. The indent step is
+     deliberately equal to --tree-chevron: that is what keeps a folder's icon and
+     label in the same columns as the items inside it (see the tree block below),
+     and 16px is the tightest step that still reads as a separate level. */
+  --twisty-w: 16px;
+  --tree-indent: 16px;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #101216;
+  --bg-canvas: #14171d;
+  --bg-raised: #1b1f26;
+  --bg-sunken: #23272f;
+  --bg-hover: #262b34;
+  --bg-active: #2a3157;
+
+  --text: #e8ebf1;
+  --text-muted: #9aa2b1;
+  --text-faint: #6e7788;
+  --text-inverse: #0d1015;
+
+  --border: #272c35;
+  --border-strong: #3b424e;
+
+  --accent: #7d8dff;
+  --accent-hover: #93a0ff;
+  --accent-soft: #232a4d;
+  --accent-ring: rgba(125, 141, 255, 0.36);
+  --danger: #ff7385;
+  --danger-soft: #3a1e24;
+  --success: #46c98a;
+  --warning: #e0b054;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45);
+  --shadow-md: 0 8px 24px -8px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 32px 64px -24px rgba(0, 0, 0, 0.72);
+  --shadow-accent: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+/* ------------------------------------------------------------- palettes
+   Six palettes, each valid in both modes. Indigo is the default and is already what
+   the two blocks above declare, so it has no block of its own here: the default stays
+   defined in exactly one place instead of being copied, and any name the app fails to
+   recognise falls through to it.
+
+   A palette overrides the surfaces and the accent family together, because those are
+   one decision. An amber accent dropped onto indigo's cool grey rail reads as a bug,
+   not as a palette. Text, danger, success and warning are deliberately left alone:
+   those tokens carry meaning rather than mood. A destructive button has to look
+   destructive in all six, and body text has to keep the contrast it was measured for
+   against whichever surfaces the palette chose.
+
+   Each block is scoped to one mode. The dark selectors carry both attributes, so they
+   win on specificity (0,2,0 against 0,1,0) and never depend on source order. */
+[data-palette="teal"] {
+  --bg: #f2f6f5;
+  --bg-canvas: #f9fbfb;
+  --bg-raised: #ffffff;
+  --bg-sunken: #e9f0ee;
+  --bg-hover: #e4ecea;
+  --bg-active: #dff0ee;
+  --border: #dde6e4;
+  --border-strong: #c6d2cf;
+  --accent: #0f766e;
+  --accent-hover: #0b5f59;
+  --accent-soft: #e0f2f0;
+  --accent-ring: rgba(15, 118, 110, 0.30);
+  --shadow-accent: 0 1px 2px rgba(15, 118, 110, 0.24);
+}
+
+[data-theme="dark"][data-palette="teal"] {
+  --bg: #0e1416;
+  --bg-canvas: #121a1c;
+  --bg-raised: #182124;
+  --bg-sunken: #1f2b2d;
+  --bg-hover: #233033;
+  --bg-active: #123a35;
+  --border: #243033;
+  --border-strong: #37474a;
+  --accent: #3ecfb8;
+  --accent-hover: #5ce0ca;
+  --accent-soft: #123330;
+  --accent-ring: rgba(62, 207, 184, 0.34);
+  --shadow-accent: 0 1px 2px rgba(0, 0, 0, 0.28);
+}
+
+[data-palette="amber"] {
+  --bg: #f7f5f1;
+  --bg-canvas: #fcfbf8;
+  --bg-raised: #ffffff;
+  --bg-sunken: #f0ece5;
+  --bg-hover: #ebe6dd;
+  --bg-active: #f7ecd8;
+  --border: #e6e0d6;
+  --border-strong: #d2c9ba;
+  --accent: #a15c07;
+  --accent-hover: #8a4e05;
+  --accent-soft: #fbf0dd;
+  --accent-ring: rgba(161, 92, 7, 0.28);
+  --shadow-accent: 0 1px 2px rgba(161, 92, 7, 0.24);
+}
+
+[data-theme="dark"][data-palette="amber"] {
+  --bg: #14120e;
+  --bg-canvas: #191612;
+  --bg-raised: #211d17;
+  --bg-sunken: #2a251d;
+  --bg-hover: #302a21;
+  --bg-active: #3a2e18;
+  --border: #2e2820;
+  --border-strong: #453d31;
+  --accent: #e0a13f;
+  --accent-hover: #f0b45e;
+  --accent-soft: #382a13;
+  --accent-ring: rgba(224, 161, 63, 0.32);
+  --shadow-accent: 0 1px 2px rgba(0, 0, 0, 0.28);
+}
+
+[data-palette="rose"] {
+  --bg: #f7f3f5;
+  --bg-canvas: #fcfafb;
+  --bg-raised: #ffffff;
+  --bg-sunken: #f0e9ec;
+  --bg-hover: #ebe2e6;
+  --bg-active: #fae3ea;
+  --border: #e6dee2;
+  --border-strong: #d2c3ca;
+  --accent: #b3325a;
+  --accent-hover: #992a4d;
+  --accent-soft: #fce8ee;
+  --accent-ring: rgba(179, 50, 90, 0.28);
+  --shadow-accent: 0 1px 2px rgba(179, 50, 90, 0.24);
+}
+
+[data-theme="dark"][data-palette="rose"] {
+  --bg: #141013;
+  --bg-canvas: #1a1417;
+  --bg-raised: #221a1e;
+  --bg-sunken: #2b2126;
+  --bg-hover: #31262b;
+  --bg-active: #3c2029;
+  --border: #2f2429;
+  --border-strong: #46363d;
+  --accent: #ff8098;
+  --accent-hover: #ff9dae;
+  --accent-soft: #3a1d26;
+  --accent-ring: rgba(255, 128, 152, 0.32);
+  --shadow-accent: 0 1px 2px rgba(0, 0, 0, 0.28);
+}
+
+[data-palette="violet"] {
+  --bg: #f5f3f8;
+  --bg-canvas: #fbfafd;
+  --bg-raised: #ffffff;
+  --bg-sunken: #eeeaf4;
+  --bg-hover: #e8e4f0;
+  --bg-active: #eadff9;
+  --border: #e2dde9;
+  --border-strong: #cabfd9;
+  --accent: #6d34c4;
+  --accent-hover: #5d2aa9;
+  --accent-soft: #ede4fb;
+  --accent-ring: rgba(109, 52, 196, 0.28);
+  --shadow-accent: 0 1px 2px rgba(109, 52, 196, 0.24);
+}
+
+[data-theme="dark"][data-palette="violet"] {
+  --bg: #110f16;
+  --bg-canvas: #16141c;
+  --bg-raised: #1e1a26;
+  --bg-sunken: #272130;
+  --bg-hover: #2d2638;
+  --bg-active: #2c2350;
+  --border: #2a2433;
+  --border-strong: #3f3650;
+  --accent: #b79cff;
+  --accent-hover: #c9b3ff;
+  --accent-soft: #2a2145;
+  --accent-ring: rgba(183, 156, 255, 0.34);
+  --shadow-accent: 0 1px 2px rgba(0, 0, 0, 0.28);
+}
+
+[data-palette="graphite"] {
+  --bg: #f4f5f6;
+  --bg-canvas: #fafafa;
+  --bg-raised: #ffffff;
+  --bg-sunken: #eceef0;
+  --bg-hover: #e7e9ec;
+  --bg-active: #e3e6ea;
+  --border: #e0e2e5;
+  --border-strong: #c9ccd1;
+  --accent: #4a5260;
+  --accent-hover: #3b424e;
+  --accent-soft: #e8eaee;
+  --accent-ring: rgba(74, 82, 96, 0.26);
+  --shadow-accent: 0 1px 2px rgba(74, 82, 96, 0.24);
+}
+
+[data-theme="dark"][data-palette="graphite"] {
+  --bg: #101113;
+  --bg-canvas: #141619;
+  --bg-raised: #1b1e22;
+  --bg-sunken: #23262b;
+  --bg-hover: #26292f;
+  --bg-active: #30363f;
+  --border: #272a2f;
+  --border-strong: #3b4048;
+  --accent: #b9c2d0;
+  --accent-hover: #ccd4e0;
+  --accent-soft: #262b33;
+  --accent-ring: rgba(185, 194, 208, 0.30);
+  --shadow-accent: 0 1px 2px rgba(0, 0, 0, 0.28);
+}

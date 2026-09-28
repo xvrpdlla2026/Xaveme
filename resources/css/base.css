@@ -1,0 +1,108 @@
+/* ==========================================================================
+   Notebook: base
+
+   The reset, the page-level typography, the shared icon box, the
+   screen-reader helper and the scrollbar treatment: everything that applies to
+   bare elements or to helpers used in every zone.
+   ========================================================================== */
+
+/* ------------------------------------------------------------ base reset */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  font-family: var(--font);
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, p { margin: 0; }
+button { font: inherit; color: inherit; }
+input, textarea, select { font: inherit; }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+
+::selection { background: var(--accent-soft); color: var(--text); }
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0);
+  white-space: nowrap; border: 0;
+}
+
+.is-hidden { display: none !important; }
+
+/* ------------------------------------------------------------------ icons */
+/* Sized in em so one font-size declaration controls the tile it sits in. */
+.icon {
+  width: 1em;
+  height: 1em;
+  flex: 0 0 auto;
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  /* Round joins, not the default miter: the gear's tooth tips are acute angles, and a miter
+     there throws a spike well outside the 24px grid. Rounding them keeps every glyph's
+     silhouette inside its own box, which is what stops icons looking different weights. */
+  stroke-linejoin: round;
+  color: inherit;
+  /* Fallback for an icon with no font-size set by its container. */
+  font-size: 16px;
+}
+.icon--spin { animation: icon-spin 700ms linear infinite; }
+@keyframes icon-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ------------------------------------------------------------ scrollbars */
+/* One scrollbar design for every scroller in the app - the rail, the canvas, the
+   editor, the dialog bodies, the trash list, the menus and the select listbox. It
+   used to be declared on .tree and .main alone, which left a default grey bar on
+   every surface added since (the panel, the menus), and those are exactly the
+   surfaces that hold the longest lists.
+   Two mechanisms, because no engine implements both:
+     - Blink and WebKit get the pseudo-elements. They are the only way to inset the
+       thumb inside its track with a transparent border, which is what gives the
+       rounded, airy bar this interface uses.
+     - Firefox has no pseudo-elements at all, so it gets the standard properties.
+   They cannot be declared together: since Chrome 121, setting scrollbar-color
+   switches the engine off the legacy pseudo-elements and every ::-webkit-* rule
+   below stops applying. "@supports not selector(...)" is the standard way to reach
+   Firefox alone - Firefox does not implement ::-webkit-scrollbar, so the test is
+   false there and true in Blink/WebKit. */
+::-webkit-scrollbar { width: 12px; height: 12px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  /* The air between thumb and track is the transparent border, not a margin: a
+     border is part of the thumb's box, so the thumb stays draggable edge to edge
+     while only its middle 6px paints. */
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--text-faint); background-clip: content-box; }
+::-webkit-scrollbar-corner { background: transparent; }
+/* A scrollbar here is a position indicator, not chrome: no stepper arrows. */
+::-webkit-scrollbar-button { display: none; }
+
+@supports not selector(::-webkit-scrollbar) {
+  html { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
+}
