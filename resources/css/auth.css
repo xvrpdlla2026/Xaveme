@@ -80,6 +80,145 @@
   text-decoration: underline;
 }
 
+/* --------------------------------------------------------------- sign in */
+/* Sign in is a split, not a centred card. The left half is the only place in the app that
+   explains the notebook to someone who is not in it yet, and the right half is the one thing
+   to do; a card floating in the middle of an empty page explains nothing and wastes the width.
+   The split is 1.05 to 1: the statement is wider than the form, which is how it reads. */
+.auth--split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  align-items: stretch;
+  place-items: stretch;
+  padding: 0;
+}
+
+.auth__aside {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 24px;
+  padding: 56px clamp(28px, 5vw, 72px);
+  border-right: 1px solid var(--border);
+  /* A tint drawn from the live accent rather than a picture: the panel is a surface of the
+     app, and an accent-lit corner is what makes it more than a plain column. */
+  background:
+    radial-gradient(120% 80% at 0% 0%, var(--accent-soft), transparent 58%),
+    var(--bg-sunken);
+}
+
+.auth__aside-title {
+  font-size: clamp(26px, 2.6vw, 34px);
+  line-height: 1.12;
+  font-weight: 650;
+  letter-spacing: -0.028em;
+  color: var(--text);
+  max-width: 20ch;
+}
+
+.auth__aside-sub {
+  margin-top: 12px;
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: var(--text-muted);
+  max-width: 44ch;
+}
+
+.auth__facts {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-width: 50ch;
+}
+
+.auth__facts li {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
+.auth__facts .icon {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--accent);
+}
+
+.auth__facts strong {
+  color: var(--text);
+  font-weight: 620;
+}
+
+.auth__aside-foot {
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-faint);
+  max-width: 44ch;
+}
+
+.auth--split .auth__card {
+  align-self: center;
+  justify-self: center;
+  margin: 48px clamp(20px, 4vw, 56px);
+  max-width: 400px;
+}
+
+/* The password row: one frame holding both the field and its reveal control. Drawn on the
+   row rather than on the input, so the control sits inside the field instead of outside it,
+   and the focus ring wraps the pair. The input gives up its own border and ring inside. */
+.auth__field {
+  gap: 6px;
+  padding-right: 4px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--bg-raised);
+  transition: border-color var(--fast), box-shadow var(--fast);
+}
+.auth__field .field__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  background: none;
+}
+.auth__field .field__input:hover { border-color: transparent; }
+.auth__field .field__input:focus { border-color: transparent; box-shadow: none; }
+.auth__field:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+.auth__reveal { flex: 0 0 auto; color: var(--text-faint); }
+.auth__reveal:hover { color: var(--text); }
+
+/* The one place the form says it is working. The glyph turns; the label keeps the button's
+   width steady so the layout does not jump when it appears. */
+.auth__submit .icon { animation: auth-spin 900ms linear infinite; }
+
+@keyframes auth-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 880px) {
+  /* One column: the statement goes, the form stays. It has said its piece by the time the
+     reader is on a phone and wants to be in. */
+  .auth--split {
+    display: block;
+    padding: 24px 16px;
+  }
+
+  .auth__aside { display: none; }
+
+  .auth--split .auth__card {
+    margin: 0 auto;
+    max-width: 400px;
+  }
+}
+
 @media (max-width: 420px) {
   .auth {
     padding: 16px 12px;
@@ -88,4 +227,10 @@
   .auth__card {
     padding: 22px 18px 20px;
   }
+
+  .auth--split { padding: 20px 12px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth__submit .icon { animation: none; }
 }
