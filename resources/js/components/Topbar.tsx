@@ -22,8 +22,6 @@ export interface TopbarProps {
   /** Only meaningful under 820px: brings the list pane back in front of the detail pane. */
   onShowList: () => void;
   onSettings: () => void;
-  /** The class name the mobile pane switch keys off. */
-  isMobileList: boolean;
 }
 
 export default function Topbar({
@@ -34,7 +32,6 @@ export default function Topbar({
   openTasks,
   onShowList,
   onSettings,
-  isMobileList,
 }: TopbarProps): JSX.Element {
   const { theme, setTheme } = usePreferences();
   const searchRef = useRef<HTMLInputElement | null>(null);
@@ -68,7 +65,7 @@ export default function Topbar({
   return (
     <header className="topbar">
       <button
-        className={'icon-btn nav-toggle' + (isMobileList ? '' : ' is-hidden')}
+        className="icon-btn nav-toggle"
         type="button"
         aria-label="Show the notebook list"
         title="Show the notebook list"

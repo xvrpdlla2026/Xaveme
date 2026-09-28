@@ -25,6 +25,17 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/* The mount point carries the column the page used to be: body is a flex column
+   and the topbar and .layout are its two rows, so #app has to be the same shape
+   and take the remaining height. Without this the grid has no height to divide
+   and the rail and the canvas stop describing one screen. */
+#app {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
 h1, h2, h3, p { margin: 0; }
 button { font: inherit; color: inherit; }
 input, textarea, select { font: inherit; }
