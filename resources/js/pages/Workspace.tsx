@@ -29,6 +29,7 @@ import {
   unlockVault,
 } from "../lib/crypto";
 import type { VaultStatus } from "../lib/crypto";
+import { formatBytes, formatRelative } from "../lib/format";
 import type {
   Attachment,
   Folder,
@@ -39,14 +40,14 @@ import type {
 } from "../types";
 import Editor from "../components/Editor";
 import type { EditorSave } from "../components/Editor";
-import EmptyState from "../components/EmptyState";
+import Crumbs, { folderChain } from "../components/Crumbs";
+import FolderView from "../components/FolderView";
 import Icon from "../components/Icon";
 import Sidebar from "../components/Sidebar";
 import type { ContextItem, Selection, TreeActions } from "../components/Tree";
 import Topbar from "../components/Topbar";
 import type { WorkspaceView } from "../components/Topbar";
 import { ConfirmDialog, ContextMenu, PromptDialog } from "../components/dialogs";
-import { AttachmentsPanel } from "../panes/AttachmentsPanel";
 import { Dropzone } from "../panes/Dropzone";
 import { SettingsDialog } from "../panes/SettingsDialog";
 import { TaskPane } from "../panes/TaskPane";
@@ -1104,13 +1105,9 @@ export default function Workspace(): JSX.Element {
 
   const workspace = workspaces.find((entry) => entry.id === workspaceId) ?? null;
   const searching = search.trim().length > 0;
-  const locked = vault === "locked";
-  // With nothing open the page draws an empty state of its own, and the attachments pane draws
-  // one as well. The two landed stacked on a workspace that holds nothing, both offering Upload
-  // file and both explaining the same drop target. They are now exclusive: this page's card is
-  // the one for a workspace with nothing in it at all, and the pane's is the one for everything
-  // else, which is also the only card that can name the folder it is talking about.
-  const workspaceEmpty = notes.length === 0 && folders.length === 0 && attachments.length === 0;
+  // Read once here: the branches below exclude a file one at a time, and the last of them is
+  // left with a value the checker knows is null.
+  const openAttachmentId = activeAttachment ? activeAttachment.id : null;
 
   const onPickFile = (): void => {
     uploadFolder.current = targetFolder();
@@ -1238,7 +1235,7 @@ export default function Workspace(): JSX.Element {
           expanded={expanded}
           selection={selection}
           activeNoteId={activeNoteId}
-          activeAttachmentId={activeAttachment ? activeAttachment.id : null}
+          activeAttachmentId={openAttachmentId}
           treeActions={treeActions}
           storage={{
             usedBytes: stats ? stats.attachment_bytes ?? 0 : 0,
@@ -1257,7 +1254,37 @@ export default function Workspace(): JSX.Element {
           {view === "tasks" ? (
             <TaskPane workspaceId={workspaceId ?? ""} />
           ) : activeAttachment ? (
-            <AttachmentView attachment={activeAttachment} onClose={() => setActiveAttachment(null)} />
+            <AttachmentView
+              attachment={activeAttachment}
+              chain={folderChain(folders, activeAttachment.folder_id ?? null)}
+              onSelectFolder={(id) => treeActions.onSelect({ type: "folder", id })}
+              onRename={() => renameAttachment(activeAttachment.id)}
+              onMove={(x, y) =>
+                setMenu({
+                  x,
+                  y,
+                  title: 'Move "' + activeAttachment.filename + '"',
+                  items: [
+                    {
+                      id: "root",
+                      label: "Move to the workspace root",
+                      icon: "layers",
+                      onSelect: () => void moveAttachment(activeAttachment.id, null),
+                    },
+                    ...folders
+                      .filter((entry) => entry.id !== (activeAttachment.folder_id ?? null))
+                      .map((entry) => ({
+                        id: entry.id,
+                        label: 'Into "' + entry.name + '"',
+                        icon: "folder" as const,
+                        onSelect: () => void moveAttachment(activeAttachment.id, entry.id),
+                      })),
+                  ],
+                })
+              }
+              onDelete={() => deleteAttachment(activeAttachment.id)}
+              onClose={() => setActiveAttachment(null)}
+            />
           ) : editorNote ? (
             <Editor
               key={editorNote.id}
@@ -1287,35 +1314,19 @@ export default function Workspace(): JSX.Element {
                   : "Folders, notes and files are on their way."}
               </p>
             </div>
-          ) : workspaceEmpty ? (
-            <EmptyState
-              big
-              mark="NB"
-              body={
-                locked
-                  ? "Pick a note from the tree. Note bodies stay sealed until the vault is unlocked."
-                  : "Pick a note from the tree, write a new one, or drop a file anywhere to attach it."
-              }
-              actions={
-                <>
-                  <button className="btn btn--primary" type="button" onClick={() => void newNote(targetFolder())}>
-                    New note
-                  </button>
-                  <button className="btn btn--ghost" type="button" onClick={onPickFile}>
-                    Upload file
-                  </button>
-                </>
-              }
+          ) : (
+            <FolderView
+              workspaceName={workspace ? workspace.name : "this workspace"}
+              selection={selection}
+              folders={folders}
+              notes={notes}
+              attachments={attachments}
+              activeNoteId={activeNoteId}
+              activeAttachmentId={openAttachmentId}
+              onUpload={onPickFile}
+              actions={treeActions}
             />
-          ) : null}
-
-          {view === "notes" && !activeNote && !activeAttachment ? (
-            <AttachmentsPanel
-              workspaceId={workspaceId ?? ""}
-              folderId={selection.type === "folder" ? selection.id : null}
-              showEmptyState={!workspaceEmpty}
-            />
-          ) : null}
+          )}
         </main>
 
         <button
@@ -1416,8 +1427,26 @@ export default function Workspace(): JSX.Element {
 }
 
 /** The open file, drawn in the main pane instead of the editor. */
-function AttachmentView({ attachment, onClose }: { attachment: Attachment; onClose: () => void }): JSX.Element {
-  const inline = attachment.mime_type.startsWith("image/") || attachment.mime_type === "application/pdf";
+function AttachmentView({
+  attachment,
+  chain,
+  onSelectFolder,
+  onRename,
+  onMove,
+  onDelete,
+  onClose,
+}: {
+  attachment: Attachment;
+  /** The folders above this file, outermost first, so the path can be walked back. */
+  chain: Folder[];
+  onSelectFolder: (id: string) => void;
+  onRename: () => void;
+  onMove: (x: number, y: number) => void;
+  onDelete: () => void;
+  onClose: () => void;
+}): JSX.Element {
+  const mime = attachment.mime_type || "";
+  const inline = mime.startsWith("image/") || mime === "application/pdf";
   return (
     <div className="preview">
       <div className="pane-head">
@@ -1426,9 +1455,17 @@ function AttachmentView({ attachment, onClose }: { attachment: Attachment; onClo
         </span>
         <div className="pane-head__text">
           <h2 className="pane-head__title">{attachment.filename}</h2>
+          {/* Where the file lives, as navigation rather than as a caption: every step back up
+              the tree is a button, and the file itself is the trailing label. */}
+          <p className="pane-head__path">
+            <Crumbs chain={chain} item={attachment.filename} onSelect={onSelectFolder} />
+          </p>
           <p className="pane-head__sub">
-            {attachment.mime_type || "unknown type"} · {attachment.size} bytes · added 
-            {new Date(attachment.created_at).toLocaleDateString()}
+            {(attachment.mime_type || "unknown type") +
+              " · " +
+              formatBytes(attachment.size) +
+              " · added " +
+              formatRelative(attachment.created_at)}
           </p>
         </div>
       </div>
@@ -1446,12 +1483,34 @@ function AttachmentView({ attachment, onClose }: { attachment: Attachment; onClo
       </div>
       <div className="preview__actions">
         <a className="btn btn--primary" href={attachmentApi.downloadUrl(attachment.id)}>
+          <Icon name="download" size={14} />
           Download
         </a>
         <a className="btn" href={attachmentApi.previewUrl(attachment.id)} target="_blank" rel="noreferrer">
+          <Icon name="external" size={14} />
           Open in a new tab
         </a>
+        <button className="btn btn--ghost" type="button" onClick={onRename}>
+          <Icon name="pencil" size={14} />
+          Rename
+        </button>
+        <button
+          className="btn btn--ghost"
+          type="button"
+          onClick={(event) => {
+            const box = event.currentTarget.getBoundingClientRect();
+            onMove(box.left, box.bottom + 6);
+          }}
+        >
+          <Icon name="layers" size={14} />
+          Move to...
+        </button>
+        <button className="btn btn--danger-ghost" type="button" onClick={onDelete}>
+          <Icon name="trash" size={14} />
+          Delete
+        </button>
         <button className="btn btn--ghost" type="button" onClick={onClose}>
+          <Icon name="close" size={14} />
           Close
         </button>
       </div>

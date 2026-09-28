@@ -12,6 +12,9 @@
 /* --------------------------------------------------------------- buttons */
 .btn {
   display: inline-flex;
+  /* A button is a control, not a citation: an anchor that carries .btn (a download, a preview
+     in another tab) must not come with the browser's underline. */
+  text-decoration: none;
   align-items: center;
   justify-content: center;
   gap: 7px;
