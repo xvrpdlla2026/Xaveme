@@ -817,21 +817,35 @@ export default function Workspace(): JSX.Element {
    */
   const activeBody = activeNote ? activeNote.content : null;
   const activeBodyId = activeNote ? activeNote.id : null;
+  // What is on screen, readable from an async failure without making the open effect depend on
+  // the state it writes.
+  const openedBodyRef = useRef<{ id: string; content: string } | null>(null);
+  openedBodyRef.current = openedBody;
   useEffect(() => {
     if (!activeBody || !activeBodyId || !isEnvelope(activeBody) || vault !== "unlocked") {
       setOpeningBody(false);
       return;
     }
+    const bodyId = activeBodyId;
     let cancelled = false;
     setOpeningBody(true);
     openText(activeBody)
       .then((plain) => {
-        if (!cancelled) setOpenedBody({ id: activeBodyId, content: plain });
+        if (!cancelled) setOpenedBody({ id: bodyId, content: plain });
       })
       .catch((error: unknown) => {
         if (cancelled) return;
-        setOpenedBody(null);
-        report(error, "This note could not be opened, so it is not shown and will not be written over.");
+        // A body that would not open is not a reason to throw away the text already on screen:
+        // clearing this unmounts the editor, and the fields it holds go with it, including
+        // whatever the reader has typed since. Only a note this page has no plaintext for falls
+        // back to the sealed pane below.
+        const held = openedBodyRef.current;
+        if (held && held.id === bodyId) {
+          report(error, "This note's stored body could not be opened, so the text already on screen is kept.");
+        } else {
+          setOpenedBody(null);
+          report(error, "This note could not be opened, so it is not shown and will not be written over.");
+        }
       })
       .finally(() => {
         if (!cancelled) setOpeningBody(false);
