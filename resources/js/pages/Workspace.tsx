@@ -70,6 +70,24 @@ function countTrash(contents: TrashContents): number {
   return contents.folders.length + contents.notes.length + contents.attachments.length;
 }
 
+/**
+ * A note's text, whatever the API said.
+ *
+ * A note's body is nullable on the server, so a brand new note arrives with content: null
+ * rather than the empty string it was created with. That null must not survive: a field handed
+ * one holds a value that is not text, and the next save gives it to the encoder, which turns
+ * null into the four characters "null" and seals them. Every note read in, patched or created
+ * passes through here, so this page's copy of a note is always text.
+ */
+function noteText(value: string | null | undefined): string {
+  return typeof value === "string" ? value : "";
+}
+
+/** The row as the page stores it: a note's title and body are always strings. */
+function storedNote(note: Note): Note {
+  return { ...note, title: noteText(note.title), content: noteText(note.content) };
+}
+
 function readLastWorkspace(): string | null {
   try {
     return window.localStorage.getItem(LAST_WORKSPACE_KEY);
@@ -257,7 +275,7 @@ export default function Workspace(): JSX.Element {
         ]);
         if (signal.aborted) return;
         setFolders(folderRows);
-        setNotes(noteRows);
+        setNotes(noteRows.map(storedNote));
         setAttachments(attachmentRows);
         setStats(statsRow);
         setTrashCount(countTrash(trashRows));
@@ -347,7 +365,8 @@ export default function Workspace(): JSX.Element {
   }, [workspaceId, reloadKey]);
 
   const patchNoteLocal = useCallback((updated: Note): void => {
-    setNotes((current) => current.map((note) => (note.id === updated.id ? updated : note)));
+    const row = storedNote(updated);
+    setNotes((current) => current.map((note) => (note.id === row.id ? row : note)));
   }, []);
 
   // ----------------------------------------------------------------- optimistic order
@@ -507,7 +526,9 @@ export default function Workspace(): JSX.Element {
     async (folderId: string | null): Promise<void> => {
       if (!workspaceId) return;
       try {
-        const created = await noteApi.create(workspaceId, { title: "", content: "", folder_id: folderId });
+        const created = storedNote(
+          await noteApi.create(workspaceId, { title: "", content: "", folder_id: folderId }),
+        );
         setNotes((current) => [...current, created]);
         if (folderId) setExpanded((current) => ({ ...current, [folderId]: true }));
         setActiveNoteId(created.id);
@@ -869,11 +890,14 @@ export default function Workspace(): JSX.Element {
       // pending save of a note the reader just left landed in the note they just opened.
       const id = draft.id;
       if (!id) return;
+      // The body as text. A null here is exactly what the encoder turns into the four
+      // characters "null", so it is folded to the empty string before it can reach the seal.
+      const body = noteText(draft.content);
       // The editor only ever holds plaintext, so an envelope here means the open path did not
       // run for this body. Writing it would seal a sealed value or store ciphertext where text
       // is expected, and the server keeps no copy of what was inside it, so the save is refused
       // and the reader is told rather than being handed a note that quietly lost its text.
-      if (isEnvelope(draft.content)) {
+      if (isEnvelope(body)) {
         const message =
           "This note's body is still sealed text, so saving it would destroy it. Nothing was saved. Reopen the note from the tree.";
         toast(message, "error");
@@ -882,7 +906,7 @@ export default function Workspace(): JSX.Element {
       const sealing = vaultStatus() !== "off";
       let content: string;
       try {
-        content = sealing ? await sealText(draft.content) : draft.content;
+        content = sealing ? await sealText(body) : body;
       } catch (error) {
         // A refusal is a real save failure: the editor is told, and so is the reader, who may
         // not be looking at the status line when it happens.
@@ -890,7 +914,7 @@ export default function Workspace(): JSX.Element {
         throw error;
       }
       const payload: { title: string; content: string; encrypted?: boolean } = {
-        title: draft.title,
+        title: noteText(draft.title),
         content,
       };
       if (sealing) payload.encrypted = true;

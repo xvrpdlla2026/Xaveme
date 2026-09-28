@@ -21,6 +21,19 @@ import type { Note } from '../types';
 const SAVE_DEBOUNCE_MS = 500;
 
 /**
+ * The text a field is given.
+ *
+ * A note's body is nullable on the server, and the empty string a new note is created with is
+ * turned into null on the way in, so a brand new note arrives with content: null. That null
+ * cannot be held here: a field handed one is a field whose value is not text, and the next save
+ * gives it to the encoder, which turns null into the four characters "null" and seals them.
+ * Every value that reaches a form control or a draft passes through this.
+ */
+function asText(value: string | null | undefined): string {
+  return typeof value === 'string' ? value : '';
+}
+
+/**
  * The vault's state as the editor needs to know it. 'unknown' is a vault row that could not
  * be read, which is not the same as no vault: the editor shows nothing and edits nothing
  * until the state is a fact, because the one thing it must never do is guess "plain text".
@@ -60,8 +73,8 @@ export default function Editor({
   // note.content is plaintext by construction: the page opens a sealed body with the vault
   // key before it mounts this component, so an envelope never reaches these fields and a save
   // can never seal one twice. The page refuses the write if one ever does.
-  const [title, setTitle] = useState(note.title);
-  const [content, setContent] = useState(note.content);
+  const [title, setTitle] = useState(asText(note.title));
+  const [content, setContent] = useState(asText(note.content));
   const [status, setStatus] = useState<string>('Saved');
   const [dirty, setDirty] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -69,7 +82,7 @@ export default function Editor({
   // The note the fields currently describe. A save that resolves after the reader moved on
   // must not stamp its result onto somebody else's editor.
   const openIdRef = useRef(note.id);
-  const draftRef = useRef({ id: note.id, title: note.title, content: note.content });
+  const draftRef = useRef({ id: note.id, title: asText(note.title), content: asText(note.content) });
 
   const unreadable = vaultState === 'unknown';
   const locked = vaultState === 'locked' || unreadable;
@@ -80,13 +93,13 @@ export default function Editor({
   const [shownId, setShownId] = useState(note.id);
   if (shownId !== note.id) {
     setShownId(note.id);
-    setTitle(note.title);
-    setContent(note.content);
+    setTitle(asText(note.title));
+    setContent(asText(note.content));
     setStatus('Saved');
     setDirty(false);
     setFailed(false);
     openIdRef.current = note.id;
-    draftRef.current = { id: note.id, title: note.title, content: note.content };
+    draftRef.current = { id: note.id, title: asText(note.title), content: asText(note.content) };
   }
 
   const write = useCallback(
