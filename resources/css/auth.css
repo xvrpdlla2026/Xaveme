@@ -1,0 +1,91 @@
+/* ==========================================================================
+   Notebook: the account screens
+
+   Sign in and sign up are the only two screens with no zone to sit in: there is
+   no rail, no tree and no pane yet, so the card is the whole page. It borrows the
+   raised surface and the one shadow tier from the tokens rather than inventing a
+   second look for the first thing anyone sees.
+   ========================================================================== */
+
+.auth {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 32px 20px;
+  background: var(--bg-canvas);
+}
+
+.auth__card {
+  width: 100%;
+  max-width: 392px;
+  padding: 28px 28px 24px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+
+.auth__brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.auth__title {
+  margin: 0 0 6px;
+  font-size: 24px;
+  line-height: 1.2;
+  font-weight: 640;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.auth__sub {
+  margin: 0 0 22px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.auth__form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* One column, one width: the button answers the fields rather than sitting beside them. */
+.auth__form .btn {
+  width: 100%;
+  justify-content: center;
+  margin-top: 4px;
+}
+
+.auth__note {
+  margin: 20px 0 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.auth__note a {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.auth__note a:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 420px) {
+  .auth {
+    padding: 16px 12px;
+  }
+
+  .auth__card {
+    padding: 22px 18px 20px;
+  }
+}
