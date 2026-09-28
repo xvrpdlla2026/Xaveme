@@ -112,6 +112,10 @@ Uploads are validated against both an extension and a MIME allowlist and capped 
 written to the private disk. They are streamed back through an authorized route, so a file is
 never readable without a session that owns it.
 
+## Changelog
+
+What each release holds: [CHANGELOG.md](CHANGELOG.md).
+
 ## License
 
 MIT.
