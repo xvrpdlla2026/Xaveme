@@ -20,11 +20,20 @@ import type { Note } from '../types';
 /** How long typing rests before the note is written. */
 const SAVE_DEBOUNCE_MS = 500;
 
-/** The vault's state as the editor needs to know it. */
-export type EditorVaultState = 'off' | 'locked' | 'unlocked';
+/**
+ * The vault's state as the editor needs to know it. 'unknown' is a vault row that could not
+ * be read, which is not the same as no vault: the editor shows nothing and edits nothing
+ * until the state is a fact, because the one thing it must never do is guess "plain text".
+ */
+export type EditorVaultState = 'off' | 'locked' | 'unlocked' | 'unknown';
 
+/**
+ * The one write the editor asks for. The note's own id travels with the draft rather than being
+ * read back out of the page, because the unmount flush saves the note the fields still describe,
+ * and by then the page may already have opened another one.
+ */
 export type EditorSave = (
-  patch: { title: string; content: string },
+  patch: { id: string; title: string; content: string },
   mode: 'auto' | 'manual',
 ) => Promise<void>;
 
@@ -48,6 +57,9 @@ export default function Editor({
   onDelete,
   onUnlock,
 }: EditorProps): JSX.Element {
+  // note.content is plaintext by construction: the page opens a sealed body with the vault
+  // key before it mounts this component, so an envelope never reaches these fields and a save
+  // can never seal one twice. The page refuses the write if one ever does.
   const [title, setTitle] = useState(note.title);
   const [content, setContent] = useState(note.content);
   const [status, setStatus] = useState<string>('Saved');
@@ -57,9 +69,10 @@ export default function Editor({
   // The note the fields currently describe. A save that resolves after the reader moved on
   // must not stamp its result onto somebody else's editor.
   const openIdRef = useRef(note.id);
-  const draftRef = useRef({ title: note.title, content: note.content });
+  const draftRef = useRef({ id: note.id, title: note.title, content: note.content });
 
-  const locked = vaultState === 'locked';
+  const unreadable = vaultState === 'unknown';
+  const locked = vaultState === 'locked' || unreadable;
   const sealed = vaultState !== 'off';
 
   // Reopen the fields when the note changes. This is a render-time reset keyed to the id
@@ -73,7 +86,7 @@ export default function Editor({
     setDirty(false);
     setFailed(false);
     openIdRef.current = note.id;
-    draftRef.current = { title: note.title, content: note.content };
+    draftRef.current = { id: note.id, title: note.title, content: note.content };
   }
 
   const write = useCallback(
@@ -125,7 +138,7 @@ export default function Editor({
 
   const onChangeTitle = (value: string): void => {
     setTitle(value);
-    draftRef.current = { title: value, content: draftRef.current.content };
+    draftRef.current = { id: draftRef.current.id, title: value, content: draftRef.current.content };
     setDirty(true);
     setStatus('Unsaved...');
     scheduled();
@@ -133,7 +146,7 @@ export default function Editor({
 
   const onChangeContent = (value: string): void => {
     setContent(value);
-    draftRef.current = { title: draftRef.current.title, content: value };
+    draftRef.current = { id: draftRef.current.id, title: draftRef.current.title, content: value };
     setDirty(true);
     setStatus('Unsaved...');
     scheduled();
@@ -193,11 +206,15 @@ export default function Editor({
             <Icon name="warning" size={22} />
           </span>
           <div className="lock-notice__text">
-            <h3>This notebook is locked</h3>
-            <p>The note body is stored as sealed text. Unlock the vault to read and edit it.</p>
+            <h3>{unreadable ? 'The vault could not be read' : 'This notebook is locked'}</h3>
+            <p>
+              {unreadable
+                ? 'Its state is unknown, so no body is shown and nothing is written: a save now could seal a body twice or store it as plain text. Try again once the server answers.'
+                : 'The note body is stored as sealed text. Unlock the vault to read and edit it.'}
+            </p>
           </div>
           <button className="btn btn--primary" type="button" onClick={onUnlock}>
-            Unlock
+            {unreadable ? 'Try again' : 'Unlock'}
           </button>
         </div>
       ) : (

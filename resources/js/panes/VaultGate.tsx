@@ -19,7 +19,7 @@ import type * as React from "react";
 import * as vaultApi from "../api/vault";
 import Icon from "../components/Icon";
 import { useToast } from "../context/ToastContext";
-import { setVault, status as vaultStatus, unlockVault } from "../lib/crypto";
+import { markVaultUnknown, setVault, status as vaultStatus, unlockVault } from "../lib/crypto";
 import type { VaultStatus } from "../lib/crypto";
 
 /** Announced by every pane that moves the vault, so every other pane can re-read it. */
@@ -66,12 +66,13 @@ export function VaultGate({ children, onConfigured, onUnlocked }: { children: Re
         adopt(vaultStatus());
       })
       .catch(() => {
-        // No vault answer: the notebook is treated as plain text, which is the state every note
-        // is readable in. A gate that refused to open on a failed read would lock the reader out
-        // of their own workspace.
+        // A read that failed says nothing about whether a vault exists, so nothing is assumed:
+        // the state becomes unknown, which refuses every write, and the gate still opens rather
+        // than shutting the reader out of their own workspace. Treating this as "no vault" is
+        // what wrote plain text into a sealed notebook.
         if (!cancelled) {
-          setVault(null);
-          adopt("off");
+          markVaultUnknown();
+          adopt(vaultStatus());
         }
       })
       .finally(() => {

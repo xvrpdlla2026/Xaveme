@@ -16,6 +16,11 @@
  *      double encryption impossible to express and legacy plaintext readable with no
  *      migration.
  *
+ * A third property is about the server rather than the format: 'off' is reported only after a
+ * read of the vault row has answered and said there is none. A read that failed leaves the
+ * state unknown, and an unknown vault refuses every write, because treating an unreadable
+ * vault as an absent one is exactly how prose gets written into a sealed notebook.
+ *
  * A 401 has nothing to do with this file: the passphrase never leaves the browser.
  */
 
@@ -42,11 +47,22 @@ const TAG_BYTES = 16;
 const MIN_ITERATIONS = 1000;
 const MAX_ITERATIONS = 10000000;
 
-/** How the vault stands right now. */
-export type VaultStatus = 'off' | 'locked' | 'unlocked';
+/**
+ * How the vault stands right now.
+ *
+ * 'off' is a fact about the server, never a default: it means a read of the vault row came
+ * back and said there is none. 'unknown' means no such read has succeeded, which covers both
+ * the moment before the first answer and every read that failed. The two must not be
+ * conflated: one is a notebook without a vault, the other is a notebook whose state nobody
+ * knows, and only the first may be written to as plaintext.
+ */
+export type VaultStatus = 'off' | 'locked' | 'unlocked' | 'unknown';
 
 let key: CryptoKey | null = null;
 let vault: Vault | null = null;
+
+/** Whether a read of the vault row has answered at all. */
+let known = false;
 
 function subtle(): SubtleCrypto {
   const cryptoObj = globalThis.crypto;
@@ -97,6 +113,9 @@ export function vaultRow(): Vault | null {
 }
 
 export function status(): VaultStatus {
+  // Nothing is known until a read says so, and a failed read puts it back to nothing known.
+  // Reporting 'off' here is what let a sealed notebook be saved as plaintext.
+  if (!known) return 'unknown';
   if (!vault || !vault.configured) return 'off';
   return key ? 'unlocked' : 'locked';
 }
@@ -109,11 +128,27 @@ export function lock(): void {
   key = null;
 }
 
-/** Record what the server holds. A vault that is gone drops the key with it. */
+/**
+ * Record what the server holds. This is the only path that may report the vault as off,
+ * because it is the only one that carries an answer. A vault that is gone drops the key with
+ * it: a key with no parameters behind it could only seal records nothing can open again.
+ */
 export function setVault(row: Vault | null): void {
   const configured = !!row && !!row.salt && !!row.check_ct;
   vault = configured && row ? row : null;
+  known = true;
   if (!configured) key = null;
+}
+
+/**
+ * Record that the vault row could not be read.
+ *
+ * An unreadable row is not an absent one, and that difference is the whole point of this
+ * function: the state goes back to unknown so that every write refuses, and the key, if one
+ * was already installed, is kept rather than dropped, because a later read may well succeed.
+ */
+export function markVaultUnknown(): void {
+  known = false;
 }
 
 function normaliseIterations(value: number): number {
@@ -223,6 +258,7 @@ export function commitVault(draft: VaultDraft): Vault {
     configured: true,
   };
   vault = row;
+  known = true;
   return row;
 }
 
@@ -269,28 +305,51 @@ export async function unlockVault(row: Vault, passphrase: string): Promise<void>
   }
   key = derived;
   vault = { ...row, configured: true };
+  known = true;
 }
 
 // ------------------------------------------------------------------- read/write
 
 /**
  * Seal text when the vault is unlocked. With the vault off the text is returned unchanged,
- * which is what lets a caller stay branch-free. With a vault present but locked this
- * refuses rather than writing readable prose into an encrypted notebook.
+ * which is what lets a caller stay branch-free, and that is the only state that gives the
+ * value back untouched: a locked vault and a vault whose state could not be read both refuse,
+ * because the alternative is readable prose written into a sealed notebook.
+ *
+ * A value that already carries the envelope marker is refused in every state, before the
+ * vault is even consulted. Sealing it writes ciphertext inside ciphertext and passing it
+ * through stores ciphertext where text is expected, and neither can be undone, so neither is
+ * expressible here.
  */
 export async function sealText(text: string): Promise<string> {
+  if (isEnvelope(text)) {
+    throw new Error('This value is already sealed, and sealing it again would destroy it. Nothing was written.');
+  }
   const state = status();
   if (state === 'off') return text;
+  if (state === 'unknown') {
+    throw new Error('The vault could not be read, so this notebook is not saving anything until it can be. Nothing was written.');
+  }
   if (state === 'locked' || !key) {
     throw new Error('This notebook is locked. Unlock it with your passphrase before saving.');
   }
   return sealBytes(key, new TextEncoder().encode(text));
 }
 
-/** Open a stored value. Plaintext passes straight through, by definition. */
+/**
+ * Open a stored value. Plaintext passes straight through, by definition.
+ *
+ * This is the only way a sealed body becomes readable and the only thing that may hand a body
+ * to the editor. What it returns is plaintext and what it was given is what the next save
+ * seals, so a caller never handles an envelope as though it were the note.
+ */
 export async function openText(value: string): Promise<string> {
   if (!isEnvelope(value)) return value;
-  if (status() !== 'unlocked' || !key) {
+  const state = status();
+  if (state === 'unknown') {
+    throw new Error('The vault could not be read, so this sealed record was not opened. Nothing was changed.');
+  }
+  if (state !== 'unlocked' || !key) {
     throw new Error('An encrypted record is here, but this notebook is locked. Unlock it to read the note.');
   }
   const bytes = await openBytes(key, value);
@@ -301,6 +360,9 @@ export async function openText(value: string): Promise<string> {
 export async function sealBytesForUpload(bytes: Uint8Array): Promise<string> {
   const state = status();
   if (state === 'off') return bytesToBase64(bytes);
+  if (state === 'unknown') {
+    throw new Error('The vault could not be read, so nothing was sealed. This file was not uploaded.');
+  }
   if (state === 'locked' || !key) {
     throw new Error('This notebook is locked. Unlock it with your passphrase before attaching a file.');
   }

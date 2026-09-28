@@ -15,7 +15,7 @@
  * fields would ask for a passphrase with nowhere to type it.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import * as vaultApi from "../api/vault";
 import * as workspaceApi from "../api/workspaces";
@@ -26,6 +26,7 @@ import {
   cancelSetup,
   commitVault,
   lock,
+  markVaultUnknown,
   setVault,
   setupVault,
   status as vaultStatus,
@@ -60,6 +61,23 @@ function readLastWorkspace(): string | null {
 
 function paletteLabel(palette: Palette): string {
   return palette.charAt(0).toUpperCase() + palette.slice(1);
+}
+
+/** What the readout calls each state. An unknown vault is a read that failed, not an absent one. */
+function vaultStateLabel(state: VaultStatus): string {
+  if (state === "off") return "Off";
+  if (state === "locked") return "Locked";
+  if (state === "unlocked") return "Unlocked for this session";
+  return "Could not be read";
+}
+
+function vaultStateHint(state: VaultStatus): string {
+  if (state === "off") return "Note bodies and stored files are kept as plaintext.";
+  if (state === "locked") return "Sealed records stay unreadable until the passphrase is entered.";
+  if (state === "unlocked") {
+    return "Kept for this tab: a reload stays unlocked, and closing the tab locks it again.";
+  }
+  return "The vault row could not be read, so nothing is assumed: sealed bodies stay hidden and nothing is written until it can be.";
 }
 
 interface VaultPromptProps {
@@ -218,9 +236,12 @@ export function SettingsDialog({ open, onClose }: { open: boolean; onClose: () =
         setState(vaultStatus());
       })
       .catch(() => {
+        // A read that failed is not a vault that is absent, so the state is left unknown and
+        // every write refuses from here. Reporting "off" is how a sealed notebook came to be
+        // saved as plain text.
         if (!cancelled) {
-          setVault(null);
-          setState("off");
+          markVaultUnknown();
+          setState(vaultStatus());
         }
       });
     return () => {
@@ -281,9 +302,33 @@ export function SettingsDialog({ open, onClose }: { open: boolean; onClose: () =
     window.dispatchEvent(new Event(VAULT_CHANGED_EVENT));
   };
 
-  const openPrompt = (kind: VaultPromptKind): void => {
+  /** Read the vault row again, which is the way out of the unknown state. */
+  const readVault = useCallback((): void => {
+    vaultApi
+      .get()
+      .then((row) => {
+        setVault(row);
+        setState(vaultStatus());
+        announce();
+      })
+      .catch(() => {
+        markVaultUnknown();
+        setState(vaultStatus());
+        toast(
+          "The vault row could not be read. Nothing is assumed about it, so nothing is written until it can be.",
+          "error",
+        );
+      });
+  }, [toast]);
+
+  /** The one place the passphrase fields are emptied, so no path can leave one behind. */
+  const clearPassphrases = (): void => {
     setFirst("");
     setSecond("");
+  };
+
+  const openPrompt = (kind: VaultPromptKind): void => {
+    clearPassphrases();
     setPrompt(kind);
   };
 
@@ -318,6 +363,9 @@ export function SettingsDialog({ open, onClose }: { open: boolean; onClose: () =
       throw error;
     }
     commitVault(draft);
+    // The vault exists now, so the passphrase leaves this component's state right here rather
+    // than waiting for the next prompt to open.
+    clearPassphrases();
     setState(vaultStatus());
     setPrompt(null);
     announce();
@@ -335,6 +383,7 @@ export function SettingsDialog({ open, onClose }: { open: boolean; onClose: () =
     setVault(row);
     // A wrong passphrase fails here, inside the prompt, rather than being reported as damage.
     await unlockVault(row, value);
+    clearPassphrases();
     setState(vaultStatus());
     setPrompt(null);
     announce();
@@ -365,6 +414,7 @@ export function SettingsDialog({ open, onClose }: { open: boolean; onClose: () =
       throw error;
     }
     commitVault(draft);
+    clearPassphrases();
     setState(vaultStatus());
     setPrompt(null);
     announce();
@@ -434,15 +484,7 @@ export function SettingsDialog({ open, onClose }: { open: boolean; onClose: () =
 
   const vaultInfo = vaultRow();
   const vaultRows: ReactNode[] = [
-    infoRow(
-      "Encryption",
-      state === "off" ? "Off" : state === "locked" ? "Locked" : "Unlocked for this session",
-      state === "off"
-        ? "Note bodies and stored files are kept as plaintext."
-        : state === "locked"
-          ? "Sealed records stay unreadable until the passphrase is entered."
-          : "Kept for this tab: a reload stays unlocked, and closing the tab locks it again.",
-    ),
+    infoRow("Encryption", vaultStateLabel(state), vaultStateHint(state)),
     vaultInfo && vaultInfo.configured
       ? infoRow("Key derivation", "PBKDF2-SHA-256, " + vaultInfo.iterations.toLocaleString() + " iterations")
       : null,
@@ -550,6 +592,15 @@ export function SettingsDialog({ open, onClose }: { open: boolean; onClose: () =
                 <button className="btn btn--primary" type="button" onClick={() => openPrompt("unlock")}>
                   Unlock...
                 </button>
+              ) : state === "unknown" ? (
+                <>
+                  <button className="btn btn--primary" type="button" onClick={readVault}>
+                    Try again
+                  </button>
+                  <button className="btn" type="button" onClick={() => openPrompt("unlock")}>
+                    Unlock...
+                  </button>
+                </>
               ) : (
                 <>
                   <button className="btn" type="button" onClick={lockNow}>

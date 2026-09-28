@@ -18,7 +18,15 @@ import * as attachmentApi from "../api/attachments";
 import * as folderApi from "../api/folders";
 import * as noteApi from "../api/notes";
 import { request } from "../api/client";
-import { sealText, setVault as setVaultRow, status as vaultStatus, unlockVault } from "../lib/crypto";
+import {
+  isEnvelope,
+  markVaultUnknown,
+  openText,
+  sealText,
+  setVault as setVaultRow,
+  status as vaultStatus,
+  unlockVault,
+} from "../lib/crypto";
 import type { VaultStatus } from "../lib/crypto";
 import type {
   Attachment,
@@ -121,11 +129,20 @@ export default function Workspace(): JSX.Element {
   const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
   const [activeAttachment, setActiveAttachment] = useState<Attachment | null>(null);
 
+  /**
+   * The plaintext of the open note, keyed by the note it belongs to. A sealed body is opened
+   * once, here, and only plaintext is ever handed to the editor.
+   */
+  const [openedBody, setOpenedBody] = useState<{ id: string; content: string } | null>(null);
+  const [openingBody, setOpeningBody] = useState(false);
+
   const [trashOpen, setTrashOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [trashCount, setTrashCount] = useState(0);
   const [openTasks, setOpenTasks] = useState(0);
 
+  // What the panes draw the vault as. This default is only a paint: every write decides from
+  // the crypto module's own status, which is unknown until the vault row has been read.
   const [vault, setVault] = useState<VaultStatus>("off");
   const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -269,15 +286,19 @@ export default function Workspace(): JSX.Element {
         setVaultRow(row);
         setVault(vaultStatus());
       })
-      .catch(() => {
-        // No vault answer: the notebook is treated as plain text, which is the state every
-        // note is readable in.
-        if (!cancelled) setVault("off");
+      .catch((error: unknown) => {
+        // A read that failed says nothing about whether a vault exists, so the state becomes
+        // unknown and every write refuses until it can be read. Assuming "no vault" here is what
+        // let a sealed notebook be autosaved as plain text, silently.
+        if (cancelled) return;
+        markVaultUnknown();
+        setVault(vaultStatus());
+        report(error, "The vault could not be read, so nothing will be written until it can be.");
       });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [report]);
 
   // The storage meter needs the browser's own quota, which is the one number the server
   // cannot know.
@@ -692,12 +713,13 @@ export default function Workspace(): JSX.Element {
       if (!workspaceId) return;
       const list = Array.from(files);
       if (!list.length) return;
-      const sealed = vaultStatus() !== "off";
       let done = 0;
       for (const file of list) {
         setUploadStatus("Uploading " + file.name + " (" + String(done + 1) + " of " + String(list.length) + ")");
         try {
-          await attachmentApi.upload(workspaceId, { file, folder_id: folderId, encrypted: sealed });
+          // The bytes go up as they are: the vault seals note bodies only, never files, so the
+          // flag says false rather than claiming a seal that does not happen.
+          await attachmentApi.upload(workspaceId, { file, folder_id: folderId, encrypted: false });
           done += 1;
         } catch (error) {
           report(error, "The upload of " + file.name + " failed.");
@@ -761,6 +783,58 @@ export default function Workspace(): JSX.Element {
   /** The open note, or null when the reader is looking at something else. */
   const activeNote = useMemo(() => notes.find((note) => note.id === activeNoteId) ?? null, [activeNoteId, notes]);
 
+  // ------------------------------------------------------------ the body the editor draws
+
+  /**
+   * The open note's body, opened.
+   *
+   * A stored body is either plaintext or an envelope, and the editor may only ever be handed
+   * the first: an envelope is not the note, it is the note in a sealed form. So an envelope is
+   * opened with the vault key here, and until that has happened the editor is not mounted at
+   * all. That is what keeps the raw envelope off the screen and out of the next autosave, which
+   * would otherwise seal it a second time and destroy the text inside it.
+   */
+  const activeBody = activeNote ? activeNote.content : null;
+  const activeBodyId = activeNote ? activeNote.id : null;
+  useEffect(() => {
+    if (!activeBody || !activeBodyId || !isEnvelope(activeBody) || vault !== "unlocked") {
+      setOpeningBody(false);
+      return;
+    }
+    let cancelled = false;
+    setOpeningBody(true);
+    openText(activeBody)
+      .then((plain) => {
+        if (!cancelled) setOpenedBody({ id: activeBodyId, content: plain });
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        setOpenedBody(null);
+        report(error, "This note could not be opened, so it is not shown and will not be written over.");
+      })
+      .finally(() => {
+        if (!cancelled) setOpeningBody(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activeBody, activeBodyId, vault, report]);
+
+  /**
+   * What the editor is mounted with, or null while there is nothing safe to mount it with.
+   *
+   * The plaintext is held against the note's id rather than against the stored body it came
+   * from, because a save answers with the envelope that was just written: matching on the body
+   * would unmount the editor and lose the cursor on every autosave, and the text is the same
+   * text. What the editor is given here is plaintext, always.
+   */
+  const editorNote = useMemo((): Note | null => {
+    if (!activeNote) return null;
+    if (!isEnvelope(activeNote.content)) return activeNote;
+    if (openedBody && openedBody.id === activeNote.id) return { ...activeNote, content: openedBody.content };
+    return null;
+  }, [activeNote, openedBody]);
+
   /**
    * What the sort menu's Move up and Move down act on.
    *
@@ -790,12 +864,34 @@ export default function Workspace(): JSX.Element {
 
   const onSave: EditorSave = useCallback(
     async (draft, mode) => {
-      const id = activeNoteIdRef.current;
+      // The id is the editor's own, taken from the draft. Reading it back out of the page would
+      // write the draft into whichever note is open by the time the write runs, which is how the
+      // pending save of a note the reader just left landed in the note they just opened.
+      const id = draft.id;
       if (!id) return;
+      // The editor only ever holds plaintext, so an envelope here means the open path did not
+      // run for this body. Writing it would seal a sealed value or store ciphertext where text
+      // is expected, and the server keeps no copy of what was inside it, so the save is refused
+      // and the reader is told rather than being handed a note that quietly lost its text.
+      if (isEnvelope(draft.content)) {
+        const message =
+          "This note's body is still sealed text, so saving it would destroy it. Nothing was saved. Reopen the note from the tree.";
+        toast(message, "error");
+        throw new Error(message);
+      }
       const sealing = vaultStatus() !== "off";
+      let content: string;
+      try {
+        content = sealing ? await sealText(draft.content) : draft.content;
+      } catch (error) {
+        // A refusal is a real save failure: the editor is told, and so is the reader, who may
+        // not be looking at the status line when it happens.
+        toast(error instanceof Error ? error.message : "This note was not saved.", "error");
+        throw error;
+      }
       const payload: { title: string; content: string; encrypted?: boolean } = {
         title: draft.title,
-        content: sealing ? await sealText(draft.content) : draft.content,
+        content,
       };
       if (sealing) payload.encrypted = true;
       const updated = await noteApi.update(id, payload);
@@ -944,14 +1040,11 @@ export default function Workspace(): JSX.Element {
     fileInput.current?.click();
   };
 
+  // The topbar is a sibling of the grid, not a cell in it. The stylesheet gives .layout two
+  // columns, and a child that sets no grid-column is auto-placed into the first one, which is
+  // the rail: a topbar inside .layout took the rail's width and squeezed the editor into it.
   return (
-    <div
-      className={"layout" + (narrow && mobileList ? " is-mobile-list" : "") + (dropActive ? " is-dragging" : "")}
-      onDragEnter={onDragEnter}
-      onDragOver={onDragOver}
-      onDragLeave={onDragLeave}
-      onDrop={onDrop}
-    >
+    <>
       <Topbar
         search={search}
         onSearch={(value) => {
@@ -966,264 +1059,280 @@ export default function Workspace(): JSX.Element {
         openTasks={openTasks}
         onShowList={() => setMobileList(true)}
         onSettings={() => setSettingsOpen(true)}
-        isMobileList={narrow && mobileList}
       />
 
-      <Sidebar
-        workspaces={workspaces}
-        workspaceId={workspaceId}
-        onWorkspace={(id) => {
-          setWorkspaceId(id);
-          setActiveNoteId(null);
-          setActiveAttachment(null);
-          setSelection({ type: "all", id: null });
-        }}
-        onAddWorkspace={() => {
-          setPrompt({
-            title: "New workspace",
-            label: "Workspace name",
-            value: "",
-            confirmLabel: "Create workspace",
-            required: true,
-            onSubmit: async (value) => {
-              try {
-                const created = await request<WorkspaceModel>({
-                  method: "post",
-                  path: "/workspaces",
-                  body: { name: value },
-                });
-                setWorkspaces((current) => [...current, created]);
-                setWorkspaceId(created.id);
-              } catch (error) {
-                report(error, "The workspace could not be created.");
-                throw error;
-              }
-            },
-          });
-        }}
-        onRenameWorkspace={() => {
-          if (!workspace) return;
-          const target = workspace.id;
-          setPrompt({
-            title: "Rename workspace",
-            label: "Workspace name",
-            value: workspace.name,
-            confirmLabel: "Rename",
-            required: true,
-            onSubmit: async (value) => {
-              try {
-                const updated = await request<WorkspaceModel>({
-                  method: "patch",
-                  path: "/workspaces/" + target,
-                  body: { name: value },
-                });
-                setWorkspaces((current) => current.map((entry) => (entry.id === target ? updated : entry)));
-              } catch (error) {
-                report(error, "The workspace could not be renamed.");
-                throw error;
-              }
-            },
-          });
-        }}
-        onDeleteWorkspace={() => {
-          if (!workspace) return;
-          const target = workspace.id;
-          const name = workspace.name;
-          setConfirm({
-            title: "Delete this workspace?",
-            message: '"' + name + '" and everything inside it is deleted for good.',
-            consequences: ["Every folder, note, file and task in it goes too.", "This is not the trash."],
-            confirmLabel: "Delete workspace",
-            onConfirm: async () => {
-              try {
-                await request<null>({ method: "delete", path: "/workspaces/" + target });
-                setConfirm(null);
-                const remaining = workspaces.filter((entry) => entry.id !== target);
-                setWorkspaces(remaining);
-                const next = remaining[0];
-                setWorkspaceId(next ? next.id : null);
-                setActiveNoteId(null);
-                toast("Workspace deleted.", "success");
-              } catch (error) {
-                report(error, "The workspace could not be deleted.");
-                throw error;
-              }
-            },
-          });
-        }}
-        sort={sort}
-        onSort={setSort}
-        moveTarget={sort.key === "manual" && reorderTarget ? { label: reorderTarget.label } : null}
-        onMoveUp={() => movePosition(-1)}
-        onMoveDown={() => movePosition(1)}
-        folders={folders}
-        notes={notes}
-        attachments={attachments}
-        expanded={expanded}
-        selection={selection}
-        activeNoteId={activeNoteId}
-        activeAttachmentId={activeAttachment ? activeAttachment.id : null}
-        treeActions={treeActions}
-        storage={{
-          usedBytes: stats ? stats.attachment_bytes ?? 0 : 0,
-          noteCount: stats ? stats.notes : notes.length,
-          quotaBytes,
-          stats: stats ?? null,
-        }}
-        uploadStatus={uploadStatus}
-        onUploadClick={onPickFile}
-        onNewNote={() => void newNote(targetFolder())}
-        onOpenTrash={() => setTrashOpen(true)}
-        onContextMenu={(x, y, title, items) => setMenu({ x, y, title, items })}
-      />
-
-      <main id="main" className="main" aria-live="polite">
-        {view === "tasks" ? (
-          <TaskPane workspaceId={workspaceId ?? ""} />
-        ) : activeAttachment ? (
-          <AttachmentView attachment={activeAttachment} onClose={() => setActiveAttachment(null)} />
-        ) : activeNote ? (
-          <Editor
-            key={activeNote.id}
-            note={activeNote}
-            vaultState={vault}
-            canEdit
-            onSave={onSave}
-            onDelete={() => deleteNote(activeNote.id)}
-            onUnlock={() => window.dispatchEvent(new Event("notebook:unlock-vault"))}
-          />
-        ) : searching || loading ? (
-          <div className="pane-head">
-            <h2 className="pane-head__title">{searching ? "Search results" : "Loading this workspace"}</h2>
-            <p className="pane-head__sub">
-              {searching
-                ? notes.length + (notes.length === 1 ? " note matches " : " notes match ") + '"' + search.trim() + '"'
-                : "Folders, notes and files are on their way."}
-            </p>
-          </div>
-        ) : (
-          <EmptyState
-            big
-            mark="NB"
-            body={
-              locked
-                ? "Pick a note from the tree. Note bodies stay sealed until the vault is unlocked."
-                : "Pick a note from the tree, write a new one, or drop a file anywhere to attach it."
-            }
-            actions={
-              <>
-                <button className="btn btn--primary" type="button" onClick={() => void newNote(targetFolder())}>
-                  New note
-                </button>
-                <button className="btn btn--ghost" type="button" onClick={onPickFile}>
-                  Upload file
-                </button>
-              </>
-            }
-          />
-        )}
-
-        {view === "notes" && !activeNote && !activeAttachment ? (
-          <AttachmentsPanel
-            workspaceId={workspaceId ?? ""}
-            folderId={selection.type === "folder" ? selection.id : null}
-          />
-        ) : null}
-      </main>
-
-      <button
-        className="trash-fab"
-        type="button"
-        aria-label="Open the trash"
-        title="Open the trash"
-        onClick={() => setTrashOpen(true)}
+      <div
+        className={"layout" + (narrow && mobileList ? " is-mobile-list" : "") + (dropActive ? " is-dragging" : "")}
+        onDragEnter={onDragEnter}
+        onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
+        onDrop={onDrop}
       >
-        <Icon name="trash" size={18} />
-        {trashCount > 0 ? (
-          <span className="trash-fab__badge" aria-hidden="true">
-            {trashCount}
-          </span>
-        ) : null}
-      </button>
-
-      <Dropzone workspaceId={workspaceId ?? ""} folderId={targetFolder()} />
-
-      <input
-        ref={fileInput}
-        className="visually-hidden"
-        type="file"
-        multiple
-        accept="image/*,.pdf,.txt,.md,.docx,.doc,.csv,.json,.zip"
-        onChange={(event) => {
-          const files = event.target.files;
-          const destination = uploadFolder.current;
-          uploadFolder.current = null;
-          if (files && files.length) void uploadFiles(files, destination ?? targetFolder());
-          event.target.value = "";
-        }}
-      />
-
-      {trashOpen ? <TrashPanel workspaceId={workspaceId ?? ""} onClose={() => setTrashOpen(false)} /> : null}
-      {settingsOpen ? <SettingsDialog open onClose={() => setSettingsOpen(false)} /> : null}
-
-      {menu ? (
-        <ContextMenu items={menu.items} x={menu.x} y={menu.y} title={menu.title} onClose={() => setMenu(null)} />
-      ) : null}
-
-      {prompt ? (
-        <PromptDialog
-          open
-          title={prompt.title}
-          label={prompt.label}
-          initialValue={prompt.value}
-          confirmLabel={prompt.confirmLabel}
-          required={prompt.required}
-          onSubmit={async (value) => {
-            await prompt.onSubmit(value);
-            setPrompt(null);
+        <Sidebar
+          workspaces={workspaces}
+          workspaceId={workspaceId}
+          onWorkspace={(id) => {
+            setWorkspaceId(id);
+            setActiveNoteId(null);
+            setActiveAttachment(null);
+            setSelection({ type: "all", id: null });
           }}
-          onCancel={() => setPrompt(null)}
+          onAddWorkspace={() => {
+            setPrompt({
+              title: "New workspace",
+              label: "Workspace name",
+              value: "",
+              confirmLabel: "Create workspace",
+              required: true,
+              onSubmit: async (value) => {
+                try {
+                  const created = await request<WorkspaceModel>({
+                    method: "post",
+                    path: "/workspaces",
+                    body: { name: value },
+                  });
+                  setWorkspaces((current) => [...current, created]);
+                  setWorkspaceId(created.id);
+                } catch (error) {
+                  report(error, "The workspace could not be created.");
+                  throw error;
+                }
+              },
+            });
+          }}
+          onRenameWorkspace={() => {
+            if (!workspace) return;
+            const target = workspace.id;
+            setPrompt({
+              title: "Rename workspace",
+              label: "Workspace name",
+              value: workspace.name,
+              confirmLabel: "Rename",
+              required: true,
+              onSubmit: async (value) => {
+                try {
+                  const updated = await request<WorkspaceModel>({
+                    method: "patch",
+                    path: "/workspaces/" + target,
+                    body: { name: value },
+                  });
+                  setWorkspaces((current) => current.map((entry) => (entry.id === target ? updated : entry)));
+                } catch (error) {
+                  report(error, "The workspace could not be renamed.");
+                  throw error;
+                }
+              },
+            });
+          }}
+          onDeleteWorkspace={() => {
+            if (!workspace) return;
+            const target = workspace.id;
+            const name = workspace.name;
+            setConfirm({
+              title: "Delete this workspace?",
+              message: '"' + name + '" and everything inside it is deleted for good.',
+              consequences: ["Every folder, note, file and task in it goes too.", "This is not the trash."],
+              confirmLabel: "Delete workspace",
+              onConfirm: async () => {
+                try {
+                  await request<null>({ method: "delete", path: "/workspaces/" + target });
+                  setConfirm(null);
+                  const remaining = workspaces.filter((entry) => entry.id !== target);
+                  setWorkspaces(remaining);
+                  const next = remaining[0];
+                  setWorkspaceId(next ? next.id : null);
+                  setActiveNoteId(null);
+                  toast("Workspace deleted.", "success");
+                } catch (error) {
+                  report(error, "The workspace could not be deleted.");
+                  throw error;
+                }
+              },
+            });
+          }}
+          sort={sort}
+          onSort={setSort}
+          moveTarget={sort.key === "manual" && reorderTarget ? { label: reorderTarget.label } : null}
+          onMoveUp={() => movePosition(-1)}
+          onMoveDown={() => movePosition(1)}
+          folders={folders}
+          notes={notes}
+          attachments={attachments}
+          expanded={expanded}
+          selection={selection}
+          activeNoteId={activeNoteId}
+          activeAttachmentId={activeAttachment ? activeAttachment.id : null}
+          treeActions={treeActions}
+          storage={{
+            usedBytes: stats ? stats.attachment_bytes ?? 0 : 0,
+            noteCount: stats ? stats.notes : notes.length,
+            quotaBytes,
+            stats: stats ?? null,
+          }}
+          uploadStatus={uploadStatus}
+          onUploadClick={onPickFile}
+          onNewNote={() => void newNote(targetFolder())}
+          onOpenTrash={() => setTrashOpen(true)}
+          onContextMenu={(x, y, title, items) => setMenu({ x, y, title, items })}
         />
-      ) : null}
 
-      {confirm ? (
-        <ConfirmDialog
-          open
-          title={confirm.title}
-          message={confirm.message}
-          {...(confirm.consequences ? { consequences: confirm.consequences } : {})}
-          confirmLabel={confirm.confirmLabel}
-          danger
-          onConfirm={confirm.onConfirm}
-          onCancel={() => setConfirm(null)}
+        <main id="main" className="main" aria-live="polite">
+          {view === "tasks" ? (
+            <TaskPane workspaceId={workspaceId ?? ""} />
+          ) : activeAttachment ? (
+            <AttachmentView attachment={activeAttachment} onClose={() => setActiveAttachment(null)} />
+          ) : editorNote ? (
+            <Editor
+              key={editorNote.id}
+              note={editorNote}
+              vaultState={vault}
+              canEdit
+              onSave={onSave}
+              onDelete={() => deleteNote(editorNote.id)}
+              onUnlock={() => window.dispatchEvent(new Event("notebook:unlock-vault"))}
+            />
+          ) : activeNote ? (
+            <div className="pane-head">
+              <h2 className="pane-head__title">{openingBody ? "Opening this note" : "This note is still sealed"}</h2>
+              <p className="pane-head__sub">
+                {openingBody
+                  ? "Its body is sealed and is being opened in this browser."
+                  : "Its body is sealed and the vault could not open it, so nothing is shown and nothing will be written over it."}
+              </p>
+            </div>
+          ) : searching || loading ? (
+            <div className="pane-head">
+              <h2 className="pane-head__title">{searching ? "Search results" : "Loading this workspace"}</h2>
+              <p className="pane-head__sub">
+                {searching
+                  ? notes.length + (notes.length === 1 ? " note matches " : " notes match ") + '"' + search.trim() + '"'
+                  : "Folders, notes and files are on their way."}
+              </p>
+            </div>
+          ) : (
+            <EmptyState
+              big
+              mark="NB"
+              body={
+                locked
+                  ? "Pick a note from the tree. Note bodies stay sealed until the vault is unlocked."
+                  : "Pick a note from the tree, write a new one, or drop a file anywhere to attach it."
+              }
+              actions={
+                <>
+                  <button className="btn btn--primary" type="button" onClick={() => void newNote(targetFolder())}>
+                    New note
+                  </button>
+                  <button className="btn btn--ghost" type="button" onClick={onPickFile}>
+                    Upload file
+                  </button>
+                </>
+              }
+            />
+          )}
+
+          {view === "notes" && !activeNote && !activeAttachment ? (
+            <AttachmentsPanel
+              workspaceId={workspaceId ?? ""}
+              folderId={selection.type === "folder" ? selection.id : null}
+            />
+          ) : null}
+        </main>
+
+        <button
+          className="trash-fab"
+          type="button"
+          aria-label="Open the trash"
+          title="Open the trash"
+          onClick={() => setTrashOpen(true)}
+        >
+          <Icon name="trash" size={18} />
+          {trashCount > 0 ? (
+            <span className="trash-fab__badge" aria-hidden="true">
+              {trashCount}
+            </span>
+          ) : null}
+        </button>
+
+        <Dropzone workspaceId={workspaceId ?? ""} folderId={targetFolder()} />
+
+        <input
+          ref={fileInput}
+          className="visually-hidden"
+          type="file"
+          multiple
+          accept="image/*,.pdf,.txt,.md,.docx,.doc,.csv,.json,.zip"
+          onChange={(event) => {
+            const files = event.target.files;
+            const destination = uploadFolder.current;
+            uploadFolder.current = null;
+            if (files && files.length) void uploadFiles(files, destination ?? targetFolder());
+            event.target.value = "";
+          }}
         />
-      ) : null}
 
-      <VaultGate
-        onConfigured={() => {
-          setVault(vaultStatus());
-          refresh();
-        }}
-        onUnlocked={() => setVault(vaultStatus())}
-      >
-        <VaultUnlockListener
-          onUnlock={async (passphrase) => {
-            const row = await request<{
-              salt: string;
-              iterations: number;
-              check_iv: string;
-              check_ct: string;
-              configured: boolean;
-            }>({ method: "get", path: "/vault" });
-            await unlockVault(row, passphrase);
+        {trashOpen ? <TrashPanel workspaceId={workspaceId ?? ""} onClose={() => setTrashOpen(false)} /> : null}
+        {settingsOpen ? <SettingsDialog open onClose={() => setSettingsOpen(false)} /> : null}
+
+        {menu ? (
+          <ContextMenu items={menu.items} x={menu.x} y={menu.y} title={menu.title} onClose={() => setMenu(null)} />
+        ) : null}
+
+        {prompt ? (
+          <PromptDialog
+            open
+            title={prompt.title}
+            label={prompt.label}
+            initialValue={prompt.value}
+            confirmLabel={prompt.confirmLabel}
+            required={prompt.required}
+            onSubmit={async (value) => {
+              await prompt.onSubmit(value);
+              setPrompt(null);
+            }}
+            onCancel={() => setPrompt(null)}
+          />
+        ) : null}
+
+        {confirm ? (
+          <ConfirmDialog
+            open
+            title={confirm.title}
+            message={confirm.message}
+            {...(confirm.consequences ? { consequences: confirm.consequences } : {})}
+            confirmLabel={confirm.confirmLabel}
+            danger
+            onConfirm={confirm.onConfirm}
+            onCancel={() => setConfirm(null)}
+          />
+        ) : null}
+
+        <VaultGate
+          onConfigured={() => {
             setVault(vaultStatus());
             refresh();
           }}
-        />
-      </VaultGate>
+          onUnlocked={() => setVault(vaultStatus())}
+        >
+          <VaultUnlockListener
+            onUnlock={async (passphrase) => {
+              const row = await request<{
+                salt: string;
+                iterations: number;
+                check_iv: string;
+                check_ct: string;
+                configured: boolean;
+              }>({ method: "get", path: "/vault" });
+              await unlockVault(row, passphrase);
+              setVault(vaultStatus());
+              refresh();
+            }}
+          />
+        </VaultGate>
 
-      <span className="visually-hidden">{user ? user.id : ""}</span>
-    </div>
+        <span className="visually-hidden">{user ? user.id : ""}</span>
+      </div>
+    </>
   );
 }
 
