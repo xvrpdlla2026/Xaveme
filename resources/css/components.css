@@ -859,7 +859,7 @@ svg.tree__glyph--note { font-size: 14.5px; }
 
 /* The body copy of an empty state: the sentence under the heading, on its own measure so
    it wraps as prose rather than as one long line across the card. */
-.empty-state__body {
+.empty-state p.empty-state__body {
   margin: 6px auto 0;
   max-width: 46ch;
   font-size: 13px;
@@ -872,7 +872,7 @@ svg.tree__glyph--note { font-size: 14.5px; }
   padding: 44px 36px;
 }
 .empty-state--big h2 { font-size: 19px; letter-spacing: -0.017em; }
-.empty-state--big p { margin-top: 8px; }
+.empty-state--big p.empty-state__body { margin-top: 8px; }
 
 .empty-state__actions { display: flex; gap: 8px; justify-content: center; margin-top: 22px; }
 
@@ -2298,7 +2298,7 @@ svg.tree__glyph--note { font-size: 14.5px; }
    the whole time. The row-level rules use :where(), which adds no specificity, so the two
    classes that are actually about the control always win over "this row is hovered". */
 .task-row__action { color: var(--text-faint); }
-.task-row:where(:hover, :focus-within) .task-row__action { color: var(--text-muted); }
+.task-row:where(:hover, :focus-within) :where(.task-row__action) { color: var(--text-muted); }
 .task-row__action:not(.task-row__action--danger):hover { background: var(--bg-hover); color: var(--text); }
 .task-row__action--danger { color: var(--danger); }
 .task-row__action--danger:hover { background: var(--danger-soft); color: var(--danger); }
